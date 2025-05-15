@@ -54,3 +54,9 @@ pids
 
 # Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+#생성된 보고서 파일
+report-*.docx
+
+# python 캐시 파일
+__pycache__/
