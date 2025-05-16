@@ -6,7 +6,7 @@ import {
   OnGatewayDisconnect,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { JounalService } from './jounal.service';
+import { JournalService } from './journal.service';
 import { Injectable } from '@nestjs/common';
 
 @Injectable()
@@ -15,10 +15,10 @@ import { Injectable } from '@nestjs/common';
     origin: '*',
   },
 })
-export class JounalGateway implements OnGatewayConnection, OnGatewayDisconnect {
+export class JournalGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer() server: Server;
 
-  constructor(private jounalService: JounalService) {}
+  constructor(private journalService: JournalService) {}
 
   handleConnection(client: Socket) {
     console.log(`Client connected: ${client.id}`);
@@ -36,7 +36,7 @@ export class JounalGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @SubscribeMessage('audioData')
   async handleAudioData(client: Socket, payload: { audio: Buffer }) {
     try {
-      const text = await this.jounalService.transcribeAudioStream(
+      const text = await this.journalService.transcribeAudioStream(
         payload.audio,
       );
       client.emit('transcription', { text });

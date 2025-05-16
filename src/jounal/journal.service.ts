@@ -4,7 +4,7 @@ import { firstValueFrom } from 'rxjs';
 import * as FormData from 'form-data';
 
 @Injectable()
-export class JounalService {
+export class JournalService {
   constructor(private readonly httpService: HttpService) {}
 
   async transcribeAudio(file: Express.Multer.File): Promise<string> {
