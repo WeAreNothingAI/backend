@@ -3,10 +3,10 @@ import axios from 'axios';
 import { CreateReportDto } from './dto/create-report.dto';
 
 @Injectable()
-export class ReportService {
+export class JournalService {
   async create(dto: CreateReportDto) {
     // 1. FastAPI 호출
-    const { data } = await axios.post('http://localhost:8000/generate-docx', {
+    const { data } = await axios.post('http://localhost:8000/generate-journal-docx', {
       text: dto.text,
       date: dto.date,
       service: dto.service,
