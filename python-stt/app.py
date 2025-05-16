@@ -1,14 +1,19 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.responses import JSONResponse
 import whisper
 import tempfile
 import os
 import uvicorn
-from starlette.responses import JSONResponse
+import traceback
+import sys
 
 app = FastAPI()
 
-# CORS 설정 추가
+# Whisper 모델 로드 (기본 base 모델 사용)
+model = whisper.load_model("base")
+
+# CORS 설정
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -18,11 +23,8 @@ app.add_middleware(
     expose_headers=["*"],
 )
 
-model = whisper.load_model("base")
-print("Whisper model loaded successfully")  # 모델 로드 확인
-
-@app.options("/transcribe-buffer")
-async def transcribe_buffer_options():
+@app.options("/transcribe")
+async def transcribe_options():
     return JSONResponse(
         content={},
         headers={
@@ -33,40 +35,68 @@ async def transcribe_buffer_options():
 
 @app.post("/transcribe")
 async def transcribe_buffer(request: Request):
+    temp_file = None
+
     try:
-        print("\n=== New transcribe-buffer request ===")  # 새 요청 구분자
-        # 요청 본문에서 바이너리 데이터 읽기
         content = await request.body()
-        print(f"Received audio data length: {len(content)} bytes")  # 데이터 크기 로그
-        
-        # WAV 파일 헤더 체크
-        if len(content) > 44:  # WAV 헤더는 44바이트
-            header = content[:44]
-            print(f"WAV header: {header[:4]}")  # RIFF 식별자 확인
-        
-        # 임시 WAV 파일로 저장
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.wav') as tmp:
-            tmp.write(content)
-            tmp_path = tmp.name
-            print(f"Saved to temporary file: {tmp_path}")
+        content_size = len(content)
+
+        if content_size == 0:
+            raise Exception("빈 오디오 데이터를 받았습니다.")
+
+        # 임시 디렉토리 설정
+        try:
+            temp_dir = os.path.join(os.getcwd(), 'temp')
+            os.makedirs(temp_dir, exist_ok=True)
+        except Exception:
+            temp_dir = tempfile.gettempdir()
+
+        # 오디오 파일 저장
+        try:
+            temp_file = os.path.join(temp_dir, f'audio_{os.getpid()}_{id(content)}.webm')
+            with open(temp_file, 'wb') as f:
+                f.write(content)
+                f.flush()
+                os.fsync(f.fileno())
+        except Exception as e:
+            traceback.print_exc()
+            raise Exception("오디오 데이터를 임시 파일로 저장하는 중 오류가 발생했습니다.")
+
+        if not os.path.exists(temp_file) or os.path.getsize(temp_file) == 0:
+            raise Exception("유효한 오디오 파일이 생성되지 않았습니다.")
 
         # Whisper로 음성 인식
-        print("Starting transcription...")
-        result = model.transcribe(tmp_path)
-        print(f"Transcription result: {result['text']}")
+        try:
+            result = model.transcribe(
+                temp_file,
+                language='ko',
+                task='transcribe'
+            )
+            transcribed_text = result["text"].strip()
 
-        # 임시 파일 삭제
-        os.remove(tmp_path)
-        print("Temporary file deleted")
+            if not transcribed_text:
+                raise Exception("음성 인식 결과가 비어있습니다.")
 
-        return {"text": result["text"]}
+            return {"text": transcribed_text}
+
+        except Exception as e:
+            traceback.print_exc()
+            raise Exception(f"Whisper 처리 중 오류가 발생했습니다: {str(e)}")
+
     except Exception as e:
-        print(f"Error in transcribe_buffer: {str(e)}")
+        traceback.print_exc()
         return JSONResponse(
             status_code=500,
             content={"error": str(e)}
         )
 
+    finally:
+        # 임시 파일 삭제
+        try:
+            if temp_file and os.path.exists(temp_file):
+                os.remove(temp_file)
+        except Exception:
+            traceback.print_exc()
+
 if __name__ == "__main__":
-    print("Starting FastAPI server...")  # 서버 시작 로그
     uvicorn.run(app, host="localhost", port=5000)

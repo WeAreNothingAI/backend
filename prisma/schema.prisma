@@ -57,11 +57,11 @@ model Journal {
   id              Int       @id @default(autoincrement())
   clientId        Int
   careWorkerId    Int
-  rawAudioUrl     String?
+  rawAudioUrl     String
   transcript      String
-  summary         String
-  issues          String
-  recommendations String
+  summary         String?
+  issues          String?
+  recommendations String?
   opinion         String?
   result          String?
   note            String?
