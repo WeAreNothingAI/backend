@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>STT Test</title>
+    <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        #transcript {
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin: 10px 0;
+            min-height: 100px;
+            white-space: pre-wrap;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            font-size: 16px;
+        }
+        .recording {
+            background-color: #ff4444;
+            color: white;
+        }
+        .input-group {
+            margin: 10px 0;
+        }
+        label {
+            display: inline-block;
+            width: 120px;
+        }
+        #status {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .error {
+            background-color: #ffebee;
+            color: #c62828;
+        }
+        .success {
+            background-color: #e8f5e9;
+            color: #2e7d32;
+        }
+    </style>
+</head>
+<body>
+    <h1>STT 테스트</h1>
+    
+    <div class="input-group">
+        <label for="clientId">Client ID:</label>
+        <input type="number" id="clientId" value="1">
+    </div>
+    
+    <div class="input-group">
+        <label for="careWorkerId">CareWorker ID:</label>
+        <input type="number" id="careWorkerId" value="1">
+    </div>
+
+    <button id="recordButton">녹음 시작</button>
+    <div id="status"></div>
+    <div id="transcript"></div>
+
+    <script>
+        const socket = io('http://localhost:3000');
+        let mediaRecorder;
+        let isRecording = false;
+        let audioChunks = [];
+        const transcriptDiv = document.getElementById('transcript');
+        const recordButton = document.getElementById('recordButton');
+        const statusDiv = document.getElementById('status');
+        
+        function showStatus(message, isError = false) {
+            statusDiv.textContent = message;
+            statusDiv.className = isError ? 'error' : 'success';
+        }
+
+        async function initializeRecording() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    audio: {
+                        channelCount: 1,
+                        sampleRate: 16000,
+                        echoCancellation: true,
+                        noiseSuppression: true
+                    }
+                });
+
+                const options = {
+                    mimeType: 'audio/webm;codecs=opus',
+                    audioBitsPerSecond: 16000
+                };
+
+                mediaRecorder = new MediaRecorder(stream, options);
+                console.log('MediaRecorder created with options:', options);
+
+                mediaRecorder.ondataavailable = (event) => {
+                    if (event.data.size > 0) {
+                        audioChunks.push(event.data);
+                    }
+                };
+
+                mediaRecorder.onstop = async () => {
+                    console.log('MediaRecorder stopped, total chunks:', audioChunks.length);
+                    
+                    const audioBlob = new Blob(audioChunks, { type: options.mimeType });
+                    const arrayBuffer = await audioBlob.arrayBuffer();
+                    const audioData = new Uint8Array(arrayBuffer);
+                    
+                    socket.emit('audioData', {
+                        audio: Array.from(audioData),
+                        clientId: parseInt(document.getElementById('clientId').value),
+                        careWorkerId: parseInt(document.getElementById('careWorkerId').value)
+                    });
+                    
+                    audioChunks = [];
+                };
+
+                return stream;
+            } catch (error) {
+                console.error('Recording initialization error:', error);
+                showStatus('마이크 초기화 중 오류가 발생했습니다: ' + error.message, true);
+                throw error;
+            }
+        }
+
+        socket.on('connect', () => {
+            showStatus('서버와 연결되었습니다.');
+        });
+
+        socket.on('disconnect', () => {
+            showStatus('서버와 연결이 끊어졌습니다.', true);
+        });
+
+        recordButton.addEventListener('click', async () => {
+            if (!isRecording) {
+                try {
+                    const stream = await initializeRecording();
+                    mediaRecorder.start(1000);
+                    
+                    isRecording = true;
+                    recordButton.textContent = '녹음 중지';
+                    recordButton.classList.add('recording');
+                    transcriptDiv.textContent = '';
+                    showStatus('녹음 중...');
+                    
+                    window.recordingStream = stream;
+                } catch (error) {
+                    console.error('Recording start error:', error);
+                    showStatus('녹음을 시작할 수 없습니다: ' + error.message, true);
+                }
+            } else {
+                try {
+                    isRecording = false;
+                    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                        mediaRecorder.stop();
+                    }
+                    if (window.recordingStream) {
+                        window.recordingStream.getTracks().forEach(track => track.stop());
+                    }
+                    
+                    recordButton.textContent = '녹음 시작';
+                    recordButton.classList.remove('recording');
+                    showStatus('녹음이 중지되었습니다.');
+                } catch (error) {
+                    console.error('Recording stop error:', error);
+                    showStatus('녹음 중지 중 오류가 발생했습니다: ' + error.message, true);
+                }
+            }
+        });
+
+        socket.on('transcription', (data) => {
+            transcriptDiv.textContent += data.text + '\n';
+        });
+
+        socket.on('error', (error) => {
+            showStatus('에러: ' + error.message, true);
+        });
+    </script>
+</body>
+</html> 
