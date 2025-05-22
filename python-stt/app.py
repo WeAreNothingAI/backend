@@ -7,11 +7,15 @@ import os
 import uvicorn
 import traceback
 import sys
+from transformers import pipeline
 
 app = FastAPI()
 
-# Whisper 모델 로드 (기본 base 모델 사용)
-model = whisper.load_model("base")
+# HuggingFace Whisper 파이프라인 로드 (한국어 특화 모델 사용)
+pipe = pipeline(    
+    "automatic-speech-recognition",    
+    model="SungBeom/whisper-small-ko",    
+    device=-1) # CUDA 사용시 0, CPU만 사용할 경우 -1
 
 # CORS 설정
 app.add_middleware(
@@ -67,11 +71,7 @@ async def transcribe_buffer(request: Request):
 
         # Whisper로 음성 인식
         try:
-            result = model.transcribe(
-                temp_file,
-                language='ko',
-                task='transcribe'
-            )
+            result = pipe(temp_file)
             transcribed_text = result["text"].strip()
 
             if not transcribed_text:
