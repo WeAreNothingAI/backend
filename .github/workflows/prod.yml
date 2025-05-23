@@ -7,11 +7,13 @@ on:
 
 env:
   AWS_REGION: ap-northeast-2
-  ECR_REPOSITORY: oncare
+  NEST_ECR_REPOSITORY: oncare
+  PYTHON_ECR_REPOSITORY: oncare-python
   ECS_SERVICE: oncare-service
   ECS_CLUSTER: oncare
   ECS_TASK_DEFINITION: .aws/task-definition.json
-  CONTAINER_NAME: oncare
+  NEST_CONTAINER_NAME: oncare
+  PYTHON_CONTAINER_NAME: whisper
   DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
 permissions:
@@ -38,35 +40,48 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v1
 
-      - name: Build, tag, and push image to Amazon ECR
-        id: build-image
+      - name: Build, tag, and push NestJS image
+        id: build-nest-image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           IMAGE_TAG: latest
         run: |
-          # Build a docker container and
-          # push it to ECR so that it can
-          # be deployed to ECS.
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-          echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
-          echo "AWS_ACCESS_KEY=$AWS_ACCESS_KEY" >> .env.prod
-          echo "AWS_SECRET_KEY=$AWS_SECRET_KEY" >> .env.prod
+          docker build -f ./Dockerfile.nest -t $ECR_REGISTRY/${{ env.NEST_ECR_REPOSITORY }}:$IMAGE_TAG .
+          docker push $ECR_REGISTRY/${{ env.NEST_ECR_REPOSITORY }}:$IMAGE_TAG
+          echo "::set-output name=image::$ECR_REGISTRY/${{ env.NEST_ECR_REPOSITORY }}:$IMAGE_TAG"
 
-      - name: Fill in the new image ID in the Amazon ECS task definition
+      - name: Build, tag, and push FastAPI image
+        id: build-python-image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: latest
+        run: |
+          docker build -f ./Dockerfile.python -t $ECR_REGISTRY/${{ env.PYTHON_ECR_REPOSITORY }}:$IMAGE_TAG .
+          docker push $ECR_REGISTRY/${{ env.PYTHON_ECR_REPOSITORY }}:$IMAGE_TAG
+          echo "::set-output name=image::$ECR_REGISTRY/${{ env.PYTHON_ECR_REPOSITORY }}:$IMAGE_TAG"
+
+      - name: Fill in NestJS image in the ECS task definition
         id: task-def
         uses: aws-actions/amazon-ecs-render-task-definition@v1
         with:
           task-definition: ${{ env.ECS_TASK_DEFINITION }}
-          container-name: ${{ env.CONTAINER_NAME }}
-          image: ${{ steps.build-image.outputs.image }}
+          container-name: ${{ env.NEST_CONTAINER_NAME }}
+          image: ${{ steps.build-nest-image.outputs.image }}
           environment-variables: |
             DATABASE_URL=${{ secrets.DATABASE_URL }}
 
-      - name: Deploy Amazon ECS task definition
+      - name: Update Python container image in task definition
+        run: |
+          jq '.containerDefinitions |= map(
+            if .name == "${{ env.PYTHON_CONTAINER_NAME }}"
+            then .image = "${{ steps.build-python-image.outputs.image }}"
+            else .
+          end)' ${{ steps.task-def.outputs.task-definition }} > updated-task-def.json
+
+      - name: Deploy to Amazon ECS
         uses: aws-actions/amazon-ecs-deploy-task-definition@v1
         with:
-          task-definition: ${{ steps.task-def.outputs.task-definition }}
+          task-definition: updated-task-def.json
           service: ${{ env.ECS_SERVICE }}
           cluster: ${{ env.ECS_CLUSTER }}
           wait-for-service-stability: true
