@@ -2,7 +2,7 @@ FROM python:3.10-slim
 
 WORKDIR /python-stt
 
-COPY requirements.txt .
+COPY python-stt/requirements.txt .
 
 RUN pip install --no-cache-dir -r requirements.txt
 
