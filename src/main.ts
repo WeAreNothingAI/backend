@@ -29,6 +29,6 @@ async function bootstrap() {
     customSiteTitle: 'Oncare API Docs',
   });
 
-  await app.listen(process.env.PORT ?? 3000);
+  await app.listen(process.env.PORT ?? 80);
 }
 bootstrap();
