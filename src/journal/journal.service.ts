@@ -3,6 +3,7 @@ import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import { PrismaService } from '../prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
+import { GenerateJournalDocxResponseDto } from './dto/generate-journal-docx-response.dto';
 
 // Journal → python-report 요청용 매핑 유틸 함수 (클래스 정의 위에 선언)
 function mapJournalToRequest(journal: any) {
@@ -136,7 +137,7 @@ export class JournalService {
     }
   }
 
-  async generateJournalDocx(journalData: any): Promise<any> {
+  async generateJournalDocx(journalData: any): Promise<GenerateJournalDocxResponseDto> {
     try {
       const response = await firstValueFrom(
         this.httpService.post(
@@ -148,7 +149,7 @@ export class JournalService {
           },
         )
       );
-      return response.data; // { file, path } 등 반환
+      return response.data as GenerateJournalDocxResponseDto; // { file, path } 등 반환
     } catch (error) {
       this.logger.error('python-report 호출 중 오류:', error);
       throw new InternalServerErrorException('문서 생성 중 오류가 발생했습니다.', error.message);
