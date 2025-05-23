@@ -1,4 +1,8 @@
-import { Injectable, Logger, InternalServerErrorException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import { PrismaService } from '../prisma/prisma.service';
@@ -17,9 +21,14 @@ export class JournalService {
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
   ) {
-    this.sttServerUrl = this.configService.get<string>('STT_SERVER_URL', 'http://localhost:5000/transcribe');
+    this.sttServerUrl = this.configService.get<string>(
+      'STT_SERVER_URL',
+      'http://whisper:5000/transcribe',
+    );
     this.sttTimeout = this.configService.get<number>('STT_TIMEOUT', 30000);
-    this.logger.log(`Initialized with STT_SERVER_URL: ${this.sttServerUrl}, STT_TIMEOUT: ${this.sttTimeout}`);
+    this.logger.log(
+      `Initialized with STT_SERVER_URL: ${this.sttServerUrl}, STT_TIMEOUT: ${this.sttTimeout}`,
+    );
   }
 
   async transcribeAudioStream(audioBuffer: Buffer): Promise<string> {
@@ -28,20 +37,16 @@ export class JournalService {
     for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
       try {
         this.logger.debug(`STT attempt ${attempt}/${this.maxRetries}`);
-        
+
         const response = await firstValueFrom(
-          this.httpService.post(
-            this.sttServerUrl,
-            audioBuffer,
-            {
-              headers: {
-                'Content-Type': 'audio/webm',
-              },
-              timeout: this.sttTimeout,
-              maxContentLength: Infinity,
-              maxBodyLength: Infinity,
+          this.httpService.post(this.sttServerUrl, audioBuffer, {
+            headers: {
+              'Content-Type': 'audio/webm',
             },
-          ),
+            timeout: this.sttTimeout,
+            maxContentLength: Infinity,
+            maxBodyLength: Infinity,
+          }),
         );
 
         if (!response.data || !response.data.text) {
@@ -57,7 +62,7 @@ export class JournalService {
         );
 
         if (attempt < this.maxRetries) {
-          await new Promise(resolve => setTimeout(resolve, this.retryDelay));
+          await new Promise((resolve) => setTimeout(resolve, this.retryDelay));
           this.logger.log(`Retrying STT... (${attempt}/${this.maxRetries})`);
         }
       }
@@ -92,7 +97,7 @@ export class JournalService {
       return result;
     } catch (error) {
       this.logger.error('Error creating journal entry:', error);
-      
+
       throw new InternalServerErrorException(
         '일지 저장 중 오류가 발생했습니다.',
         error.message,
