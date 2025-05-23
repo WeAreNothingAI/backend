@@ -3,6 +3,27 @@ import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import { PrismaService } from '../prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
+import { GenerateJournalDocxResponseDto } from './dto/generate-journal-docx-response.dto';
+
+// Journal → python-report 요청용 매핑 유틸 함수 (클래스 정의 위에 선언)
+function mapJournalToRequest(journal: any) {
+  return {
+    text: journal.transcript,
+    date: journal.createdAt.toISOString().slice(0, 10),
+    service: '',
+    manager: journal.careWorker?.name ?? '',
+    method: '',
+    type: '',
+    time: '',
+    title: '',
+    category: '',
+    client: journal.client?.name ?? '',
+    contact: journal.client?.contact ?? '',
+    opinion: journal.opinion ?? '',
+    result: journal.result ?? '',
+    note: journal.note ?? '',
+  };
+}
 
 @Injectable()
 export class JournalService {
@@ -74,6 +95,14 @@ export class JournalService {
     careWorkerId: number;
     rawAudioUrl: string;
     transcript: string;
+    summary?: string | null;
+    issues?: string | null;
+    recommendations?: string | null;
+    opinion?: string | null;
+    result?: string | null;
+    note?: string | null;
+    exportedPdf?: string | null;
+    exportedDocx?: string | null;
   }) {
     try {
       this.logger.debug('Creating journal entry:', data);
@@ -84,6 +113,14 @@ export class JournalService {
           careWorkerId: data.careWorkerId,
           rawAudioUrl: data.rawAudioUrl,
           transcript: data.transcript,
+          summary: data.summary ?? '',
+          issues: data.issues ?? '',
+          recommendations: data.recommendations ?? '',
+          opinion: data.opinion ?? '',
+          result: data.result ?? '',
+          note: data.note ?? '',
+          exportedPdf: data.exportedPdf ?? '',
+          exportedDocx: data.exportedDocx ?? '',
         },
       });
 
@@ -98,5 +135,45 @@ export class JournalService {
         error.message,
       );
     }
+  }
+
+  async generateJournalDocx(journalData: any): Promise<GenerateJournalDocxResponseDto> {
+    try {
+      const response = await firstValueFrom(
+        this.httpService.post(
+          'http://localhost:8000/generate-journal-docx', // python-report FastAPI 주소
+          journalData,
+          {
+            headers: { 'Content-Type': 'application/json' },
+            timeout: 60000,
+          },
+        )
+      );
+      return response.data as GenerateJournalDocxResponseDto; // { file, path } 등 반환
+    } catch (error) {
+      this.logger.error('python-report 호출 중 오류:', error);
+      throw new InternalServerErrorException('문서 생성 중 오류가 발생했습니다.', error.message);
+    }
+  }
+
+  async summarizeJournal(id: number) {
+    const journal = await this.prisma.journal.findUnique({
+      where: { id: Number(id) },
+      include: { client: true, careWorker: true },
+    });
+    if (!journal) throw new Error('일지를 찾을 수 없습니다.');
+
+    const requestBody = mapJournalToRequest(journal);
+
+    const { data } = await firstValueFrom(
+      this.httpService.post('http://127.0.0.1:8000/generate-journal-docx', requestBody)
+    );
+
+    const updated = await this.prisma.journal.update({
+      where: { id: journal.id },
+      data: { exportedDocx: data.path },
+    });
+
+    return { ...data, updated };
   }
 }
