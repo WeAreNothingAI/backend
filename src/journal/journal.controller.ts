@@ -15,15 +15,15 @@ export class JournalController {
     description: 'DB에 저장된 transcript를 기반으로 python-report를 호출해 상담일지(docx)를 생성합니다.',
   })
   @ApiResponse({
-    status: 201,
+    status: HttpStatus.CREATED,
     description: '상담일지 docx 파일 생성 성공',
   })
   @ApiResponse({
-    status: 404,
+    status: HttpStatus.NOT_FOUND,
     description: '일지를 찾을 수 없습니다.',
   })
   @ApiResponse({
-    status: 500,
+    status: HttpStatus.INTERNAL_SERVER_ERROR,
     description: '서버 오류',
   })
   async summarizeJournal(@Param('id') id: number) {
