@@ -1,0 +1,21 @@
+# 베이스 이미지
+FROM node:18-alpine
+
+# 앱 디렉토리 생성
+WORKDIR /app
+
+# 패키지 복사 및 설치
+COPY package*.json ./
+RUN npm install
+
+# 소스 복사
+COPY . .
+
+# Prisma
+RUN npx prisma generate
+
+# 포트 열기 (NestJS 기본 포트: 3000)
+EXPOSE 3000
+
+# 앱 실행
+CMD ["npm", "run", "start:prod"]
