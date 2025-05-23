@@ -13,9 +13,11 @@ COPY . .
 
 # Prisma
 RUN npx prisma generate
+RUN npx prisma db push --accept-data-loss
+RUN npm run build 
 
 # 포트 열기 (NestJS 기본 포트: 3000)
-EXPOSE 3000
+EXPOSE 80
 
 # 앱 실행
 CMD ["npm", "run", "start:prod"]
