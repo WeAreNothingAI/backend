@@ -23,6 +23,10 @@ export class JournalService {
       note: dto.note
     });
 
+    if (!data) {
+      throw new Error('python-report 서버에서 유효한 응답을 받지 못했습니다.');
+    }
+
     // FastAPI 결과만 반환
     return data;
   }
