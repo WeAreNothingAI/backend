@@ -12,50 +12,91 @@ enum Role {
   caseManager
 }
 
-model User {
-  id           Int           @id @default(autoincrement())
-  name         String
-  userName     String
-  passwordHash String
-  phone        String
-  role         Role
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+enum SocialPlatform {
+  KAKAO
+  GOOGLE
+  NAVER
+}
+
+enum WorkEventType {
+  CLOCK_IN    // 출근
+  CLOCK_OUT   // 퇴근
+  // 추후 확장 가능
+  // OUTSIDE     // 외출
+  // RETURN      // 복귀
+}
+
+model Member {
+  id          Int            @id @default(autoincrement())
+  email       String
+  name        String
+  password    String
+  role        Role
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  deletedAt   DateTime?
 
   // Relations
-  clients            Client[]       @relation("CareWorkerClients")
-  careWorkerJournals Journal[]      @relation("CareWorkerJournals")
-  notifications      Notification[]
-  careWorkerInfo     CareWorker?    @relation("CareWorkerUser")
-  managedCareWorkers CareWorker[]   @relation("CaseManagerCareWorkers")
-  workShifts         WorkShift[]    @relation("CareWorkerWorkShifts")
+  socialAccounts    SocialAccount[]
+  managedCareWorkers ManageMember[]  @relation("CaseManagerToCareWorkers")
+  managedByCaseManager ManageMember[]  @relation("CareWorkerToCaseManager")
+  works             Work[]
+  journals          Journal[]       @relation("CareWorkerJournals")
+  notifications     Notification[]
   reportsAsCaseManager Report[]     @relation("Reports_CaseManager")
   reportsAsCareWorker  Report[]     @relation("Reports_CareWorker")
 }
 
-model Client {
-  id              Int        @id @default(autoincrement())
-  name            String
-  birthDate       DateTime
-  gender          String
-  address         String?
-  contact         String?
-  guardianContact String?
-  careWorkerId    Int
-  notes           String?
-  createdAt       DateTime   @default(now())
-  updatedAt       DateTime   @updatedAt
+model ManageMember {
+  id            Int     @id                // Member.id (role: careWorker)
+  caseManagerId Int
+  careWorker    Member  @relation("CareWorkerToCaseManager", fields: [id], references: [id])
+  caseManager   Member  @relation("CaseManagerToCareWorkers", fields: [caseManagerId], references: [id])
+}
+
+model SocialAccount {
+  id            Int           @id @default(autoincrement())
+  memberId      Int
+  platform      SocialPlatform
+  platformId    String        // 플랫폼에서 제공하는 고유 ID
+  createdAt     DateTime      @default(now())
 
   // Relations
-  careWorker      User       @relation("CareWorkerClients", fields: [careWorkerId], references: [id])
-  journals        Journal[]
-  reports         Report[]
-  workShifts      WorkShift[]
+  member        Member        @relation(fields: [memberId], references: [id])
+
+  @@unique([platform, platformId])
+}
+
+model Work {
+  id          Int       @id @default(autoincrement())
+  memberId    Int
+  date        DateTime
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  member      Member    @relation(fields: [memberId], references: [id])
+  events      WorkEvent[]
+
+  @@unique([memberId, date])
+}
+
+model WorkEvent {
+  id          Int           @id @default(autoincrement())
+  workId      Int
+  type        WorkEventType
+  time        DateTime
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  // Relations
+  work        Work          @relation(fields: [workId], references: [id])
+
+  @@index([workId])
 }
 
 model Journal {
   id              Int       @id @default(autoincrement())
-  clientId        Int
   careWorkerId    Int
   rawAudioUrl     String
   transcript      String
@@ -71,8 +112,7 @@ model Journal {
   updatedAt       DateTime  @updatedAt
 
   // Relations
-  client          Client    @relation(fields: [clientId], references: [id])
-  careWorker      User      @relation("CareWorkerJournals", fields: [careWorkerId], references: [id])
+  careWorker      Member    @relation("CareWorkerJournals", fields: [careWorkerId], references: [id])
 }
 
 model Report {
@@ -80,7 +120,6 @@ model Report {
   caseManagerId Int
   periodStart   DateTime
   periodEnd     DateTime
-  clientId      Int
   careWorkerId  Int
   content       String
   exported      String?
@@ -88,39 +127,17 @@ model Report {
   updatedAt     DateTime @updatedAt
 
   // Relations
-  caseManager   User     @relation("Reports_CaseManager", fields: [caseManagerId], references: [id])
-  client        Client   @relation(fields: [clientId], references: [id])
-  careWorker    User     @relation("Reports_CareWorker", fields: [careWorkerId], references: [id])
-}
-
-model CareWorker {
-  id            Int     @id                // User.id (role: careWorker)
-  caseManagerId Int
-  user          User    @relation("CareWorkerUser", fields: [id], references: [id])
-  caseManager   User    @relation("CaseManagerCareWorkers", fields: [caseManagerId], references: [id])
-}
-
-model WorkShift {
-  id           Int       @id @default(autoincrement())
-  careWorkerId Int
-  clientId     Int
-  startTime    DateTime
-  endTime      DateTime?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-
-  // Relations
-  careWorker   User      @relation("CareWorkerWorkShifts", fields: [careWorkerId], references: [id])
-  client       Client    @relation(fields: [clientId], references: [id])
+  caseManager   Member   @relation("Reports_CaseManager", fields: [caseManagerId], references: [id])
+  careWorker    Member   @relation("Reports_CareWorker", fields: [careWorkerId], references: [id])
 }
 
 model Notification {
   id        Int      @id @default(autoincrement())
-  userId    Int
+  memberId  Int
   title     String
   content   String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  user      User     @relation(fields: [userId], references: [id])
+  member    Member   @relation(fields: [memberId], references: [id])
 }
