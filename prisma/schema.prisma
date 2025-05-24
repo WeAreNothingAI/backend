@@ -9,7 +9,7 @@ datasource db {
 
 enum Role {
   careWorker
-  caseManager
+  socialWorker
 }
 
 enum SocialPlatform {
@@ -38,20 +38,21 @@ model Member {
 
   // Relations
   socialAccounts    SocialAccount[]
-  managedCareWorkers ManageMember[]  @relation("CaseManagerToCareWorkers")
-  managedByCaseManager ManageMember[]  @relation("CareWorkerToCaseManager")
+  managedCareWorkers ManageMember[]  @relation("SocialWorkerToCareWorkers")
+  managedBySocialWorker ManageMember[]  @relation("CareWorkerToSocialWorker")
   works             Work[]
   journals          Journal[]       @relation("CareWorkerJournals")
   notifications     Notification[]
-  reportsAsCaseManager Report[]     @relation("Reports_CaseManager")
+  reportsAsCSocialWorker Report[]     @relation("Reports_SocialWorker")
   reportsAsCareWorker  Report[]     @relation("Reports_CareWorker")
+  clients           Client[]        @relation("CareWorkerClients")
 }
 
 model ManageMember {
   id            Int     @id                // Member.id (role: careWorker)
-  caseManagerId Int
-  careWorker    Member  @relation("CareWorkerToCaseManager", fields: [id], references: [id])
-  caseManager   Member  @relation("CaseManagerToCareWorkers", fields: [caseManagerId], references: [id])
+  socialWorkerId Int
+  careWorker    Member  @relation("CareWorkerToSocialWorker", fields: [id], references: [id])
+  socialWorker   Member  @relation("SocialWorkerToCareWorkers", fields: [socialWorkerId], references: [id])
 }
 
 model SocialAccount {
@@ -65,6 +66,26 @@ model SocialAccount {
   member        Member        @relation(fields: [memberId], references: [id])
 
   @@unique([platform, platformId])
+}
+
+model Client {
+  id              Int        @id @default(autoincrement())
+  name            String
+  birthDate       DateTime
+  gender          String
+  address         String?
+  contact         String?
+  guardianContact String?
+  careWorkerId    Int
+  notes           String?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  // Relations
+  careWorker      Member       @relation("CareWorkerClients", fields: [careWorkerId], references: [id], onDelete: Cascade)
+  journals        Journal[]
+  reports         Report[]
+  workShifts      WorkShift[]
 }
 
 model Work {
@@ -117,7 +138,7 @@ model Journal {
 
 model Report {
   id            Int      @id @default(autoincrement())
-  caseManagerId Int
+  socialWorkerId Int
   periodStart   DateTime
   periodEnd     DateTime
   careWorkerId  Int
@@ -127,7 +148,7 @@ model Report {
   updatedAt     DateTime @updatedAt
 
   // Relations
-  caseManager   Member   @relation("Reports_CaseManager", fields: [caseManagerId], references: [id])
+  socialWorker   Member   @relation("Reports_SocialWorker", fields: [socialWorkerId], references: [id])
   careWorker    Member   @relation("Reports_CareWorker", fields: [careWorkerId], references: [id])
 }
 
