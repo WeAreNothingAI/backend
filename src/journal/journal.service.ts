@@ -46,7 +46,7 @@ export class JournalService {
   ) {
     this.sttServerUrl = this.configService.get<string>(
       'STT_SERVER_URL',
-      'http://localhost:5000/transcribe',
+      'http://whisper:5000/transcribe',
     );
     this.sttTimeout = this.configService.get<number>('STT_TIMEOUT', 30000);
     this.logger.log(
@@ -178,7 +178,7 @@ export class JournalService {
     try {
       const response = await firstValueFrom(
         this.httpService.post(
-          'http://localhost:5000/generate-journal-docx', // python-report FastAPI 주소
+          'http://whisper:5000/generate-journal-docx', // python-report FastAPI 주소
           journalData,
           {
             headers: { 'Content-Type': 'application/json' },
@@ -203,7 +203,7 @@ export class JournalService {
     const requestBody = mapJournalToRequest(journal);
 
     const { data } = await firstValueFrom(
-      this.httpService.post('http://localhost:5000/generate-journal-docx', requestBody)
+      this.httpService.post('http://whisper:5000/generate-journal-docx', requestBody)
     );
 
     const updated = await this.prisma.journal.update({
