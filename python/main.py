@@ -1,8 +1,8 @@
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.stt.service import create_stt_app
-from app.report.service import create_report_app
+from stt.service import create_stt_app
+from report.service import create_report_app
 
 def create_app() -> FastAPI:
     app = FastAPI()
