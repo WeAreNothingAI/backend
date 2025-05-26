@@ -26,7 +26,7 @@ async function bootstrap() {
       tagsSorter: 'alpha',
       operationsSorter: 'method',
     },
-    customSiteTitle: 'Oncare API Docs',
+    customSiteTitle: 'Oncare API Docs.',
   });
 
   await app.listen(process.env.PORT ?? 80);
