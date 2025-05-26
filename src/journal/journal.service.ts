@@ -141,7 +141,7 @@ export class JournalService {
     try {
       const response = await firstValueFrom(
         this.httpService.post(
-          'http://localhost:8000/generate-journal-docx', // python-report FastAPI 주소
+          'http://localhost:5000/generate-journal-docx', // python-report FastAPI 주소
           journalData,
           {
             headers: { 'Content-Type': 'application/json' },
@@ -166,7 +166,7 @@ export class JournalService {
     const requestBody = mapJournalToRequest(journal);
 
     const { data } = await firstValueFrom(
-      this.httpService.post('http://127.0.0.1:8000/generate-journal-docx', requestBody)
+      this.httpService.post('http://127.0.0.1:5000/generate-journal-docx', requestBody)
     );
 
     const updated = await this.prisma.journal.update({
