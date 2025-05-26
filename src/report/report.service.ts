@@ -6,7 +6,7 @@ import { CreateReportDto } from './dto/create-report.dto';
 export class JournalService {
   async create(dto: CreateReportDto) {
     // 1. FastAPI 호출
-    const { data } = await axios.post('http://whisper:5000/generate-journal-docx', {
+    const { data } = await axios.post('http://localhost:5000/generate-journal-docx', {
       text: dto.text,
       date: dto.date,
       service: dto.service,
