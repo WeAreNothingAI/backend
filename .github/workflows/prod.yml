@@ -69,6 +69,8 @@ jobs:
           image: ${{ steps.build-nest-image.outputs.image }}
           environment-variables: |
             DATABASE_URL=${{ secrets.DATABASE_URL }}
+            AWS_S3_BUCKET_NAME=${{ secrets.AWS_S3_BUCKET_NAME }}
+            OPENAI_API_KEY =${{ secrets.OPENAI_API_KEY }}
 
       - name: Update Python container image in task definition
         run: |
