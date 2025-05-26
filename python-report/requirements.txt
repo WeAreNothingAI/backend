@@ -1,6 +1,0 @@
-fastapi
-uvicorn
-openai
-docxtpl
-python-multipart
-python-dotenv

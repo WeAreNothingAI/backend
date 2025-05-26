@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "mysql"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -84,8 +84,6 @@ model Client {
   // Relations
   careWorker      Member       @relation("CareWorkerClients", fields: [careWorkerId], references: [id], onDelete: Cascade)
   journals        Journal[]
-  reports         Report[]
-  workShifts      WorkShift[]
 }
 
 model Work {
@@ -119,6 +117,7 @@ model WorkEvent {
 model Journal {
   id              Int       @id @default(autoincrement())
   careWorkerId    Int
+  clientId        Int
   rawAudioUrl     String
   transcript      String
   summary         String?
@@ -134,6 +133,7 @@ model Journal {
 
   // Relations
   careWorker      Member    @relation("CareWorkerJournals", fields: [careWorkerId], references: [id])
+  client          Client    @relation(fields:[clientId], references: [id])
 }
 
 model Report {

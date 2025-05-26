@@ -75,7 +75,7 @@ export class JournalGateway implements OnGatewayConnection, OnGatewayDisconnect 
       await this.journalService.createJournal({
         clientId: payload.clientId,
         careWorkerId: payload.careWorkerId,
-        rawAudioUrl: `audio_${client.id}_${Date.now()}`,
+        audioBuffer,
         transcript: text,
       });
       
@@ -117,7 +117,7 @@ export class JournalGateway implements OnGatewayConnection, OnGatewayDisconnect 
       const result = await this.journalService.createJournal({
         clientId: payload.clientId,
         careWorkerId: payload.careWorkerId,
-        rawAudioUrl: `temp_${client.id}_${Date.now()}`,
+        audioBuffer: Buffer.concat(audioRecords.map(r => r.buffer)),
         transcript: fullTranscript,
       });
       
