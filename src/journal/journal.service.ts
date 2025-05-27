@@ -41,7 +41,7 @@ export class JournalService {
     private readonly s3Service: S3Service,
   ) {
     this.sttServerUrl = this.configService.get<string>('STT_SERVER_URL', 'http://localhost:5000/transcribe');
-    this.sttTimeout = this.configService.get<number>('STT_TIMEOUT', 30000);
+    this.sttTimeout = this.configService.get<number>('STT_TIMEOUT', 60000);
     this.logger.log(`Initialized with STT_SERVER_URL: ${this.sttServerUrl}, STT_TIMEOUT: ${this.sttTimeout}`);
   }
 
@@ -71,7 +71,7 @@ export class JournalService {
               headers: {
                 'Content-Type': 'audio/webm',
               },
-              timeout: this.sttTimeout,
+              timeout: 60000,
               maxContentLength: Infinity,
               maxBodyLength: Infinity,
             },
@@ -126,7 +126,6 @@ export class JournalService {
     audioBuffer: Buffer;
     transcript: string;
     summary?: string | null;
-    issues?: string | null;
     recommendations?: string | null;
     opinion?: string | null;
     result?: string | null;
@@ -147,7 +146,6 @@ export class JournalService {
           rawAudioUrl,
           transcript: data.transcript,
           summary: data.summary ?? '',
-          issues: data.issues ?? '',
           recommendations: data.recommendations ?? '',
           opinion: data.opinion ?? '',
           result: data.result ?? '',
@@ -198,12 +196,19 @@ export class JournalService {
     const requestBody = mapJournalToRequest(journal);
 
     const { data } = await firstValueFrom(
-      this.httpService.post('http://127.0.0.1:5000/generate-journal-docx', requestBody)
+      this.httpService.post('http://127.0.0.1:5000/generate-journal-docx', requestBody, { timeout: 60000 })
     );
 
     const updated = await this.prisma.journal.update({
       where: { id: journal.id },
-      data: { exportedDocx: data.path },
+      data: {
+        exportedDocx: data.path,
+        summary: data.summary,
+        recommendations: data.recommendations,
+        opinion: data.opinion,
+        result: data.result,
+        note: data.note,
+      },
     });
 
     return { ...data, updated };
