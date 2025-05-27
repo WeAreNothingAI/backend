@@ -18,7 +18,7 @@ export class AppController {
 
   @Get('ping-whisper')
   async pingWhisper() {
-    const whisperUrl = 'http://python.python.local:5000/'; // 루트 라우트
+    const whisperUrl = 'http://python.service:5000'; // 루트 라우트
 
     try {
       const { data } = await firstValueFrom(this.httpService.get(whisperUrl));

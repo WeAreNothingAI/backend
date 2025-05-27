@@ -7,7 +7,7 @@ export class JournalService {
   async create(dto: CreateReportDto) {
     // 1. FastAPI 호출
     const { data } = await axios.post(
-      'http://python.python.local:5000/generate-journal-docx',
+      'http://python.service:5000/generate-journal-docx',
       {
         text: dto.text,
         date: dto.date,
