@@ -83,6 +83,7 @@ model Client {
 
   // Relations
   careWorker      Member       @relation("CareWorkerClients", fields: [careWorkerId], references: [id], onDelete: Cascade)
+  journals        Journal[]
 }
 
 model Work {
@@ -131,6 +132,7 @@ model Journal {
 
   // Relations
   careWorker      Member    @relation("CareWorkerJournals", fields: [careWorkerId], references: [id])
+  client          Client    @relation(fields:[clientId], references: [id])
 }
 
 model Report {
