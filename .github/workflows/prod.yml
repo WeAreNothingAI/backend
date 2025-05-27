@@ -76,19 +76,17 @@ jobs:
             AWS_SECRET_KEY=${{ secrets.AWS_SECRET_KEY }}
             AWS_REGION=${{ env.AWS_REGION }}
 
-      - name: Render Python container in task definition
-        id: render-python
-        uses: aws-actions/amazon-ecs-render-task-definition@v1
-        with:
-          task-definition: ${{ steps.render-nest.outputs.task-definition }}
-          container-name: ${{ env.PYTHON_CONTAINER_NAME }}
-          image: ${{ steps.build-python-image.outputs.image }}
-          environment-variables: |
-            DATABASE_URL=${{ secrets.DATABASE_URL }}
-            OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
-            AWS_ACCESS_KEY=${{ secrets.AWS_ACCESS_KEY }}
-            AWS_SECRET_KEY=${{ secrets.AWS_SECRET_KEY }}
-            AWS_REGION=${{ env.AWS_REGION }}
+      - name: Update Python container image and env vars in task definition
+        run: |
+          jq '.containerDefinitions |= map(
+            if .name == "${{ env.PYTHON_CONTAINER_NAME }}" then
+              .image = "${{ steps.build-python-image.outputs.image }}" |
+              .environment += [
+                {"name": "OPENAI_API_KEY", "value": "${{ secrets.OPENAI_API_KEY }}"},
+                {"name": "AWS_REGION", "value": "${{ env.AWS_REGION }}"}
+              ]
+            else . end
+          )' ${{ steps.render-nest.outputs.task-definition }} > updated-task-def.json
 
       - name: Deploy to oncare-service
         uses: aws-actions/amazon-ecs-deploy-task-definition@v1
