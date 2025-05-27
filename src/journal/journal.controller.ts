@@ -1,6 +1,7 @@
 import { Controller, Post, Param, HttpCode, HttpException, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { JournalService } from './journal.service';
+import { GenerateJournalDocxResponseDto, GenerateJournalPdfResponseDto } from './dto/generate-journal-docx-response.dto';
 
 @ApiTags('journal')
 @Controller('journal')
@@ -17,6 +18,7 @@ export class JournalController {
   @ApiResponse({
     status: HttpStatus.CREATED,
     description: '상담일지 docx 파일 생성 성공',
+    type: GenerateJournalDocxResponseDto,
   })
   @ApiResponse({
     status: HttpStatus.NOT_FOUND,
@@ -26,11 +28,64 @@ export class JournalController {
     status: HttpStatus.INTERNAL_SERVER_ERROR,
     description: '서버 오류',
   })
-  async summarizeJournal(@Param('id') id: number) {
-    const result = await this.journalService.summarizeJournal(id);
-    if (!result) {
-      throw new HttpException('일지를 찾을 수 없습니다.', HttpStatus.NOT_FOUND);
+  async summarizeJournal(@Param('id') id: number): Promise<GenerateJournalDocxResponseDto> {
+    try {
+      const result = await this.journalService.summarizeJournal(id);
+      return result;
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      throw new HttpException('상담일지 요약 생성 중 서버 오류', HttpStatus.INTERNAL_SERVER_ERROR);
     }
-    return result;
+  }
+
+  // PDF 변환 전용 API
+  @Post(':id/convert-pdf')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({
+    summary: '상담 일지 PDF 변환',
+    description: '이미 생성된 docx 파일을 pdf로 변환합니다.',
+  })
+  @ApiResponse({
+    status: HttpStatus.CREATED,
+    description: '상담일지 pdf 파일 변환 성공',
+    type: GenerateJournalPdfResponseDto,
+  })
+  @ApiResponse({
+    status: HttpStatus.INTERNAL_SERVER_ERROR,
+    description: '서버 오류',
+  })
+  async convertJournalPdf(@Param('id') id: number): Promise<GenerateJournalPdfResponseDto> {
+    try {
+      return await this.journalService.convertJournalPdf(id);
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      throw new HttpException('PDF 변환 중 서버 오류', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  // DOCX presigned url 반환
+  @Post(':id/download-docx')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'DOCX presigned url 반환', description: 'S3에 업로드된 docx presigned url을 반환합니다.' })
+  async downloadDocx(@Param('id') id: number) {
+    try {
+      return await this.journalService.getDocxPresignedUrl(id);
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      throw new HttpException('DOCX presigned url 생성 중 서버 오류', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  // PDF presigned url 반환
+  @Post(':id/download-pdf')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'PDF presigned url 반환', description: 'S3에 업로드된 pdf presigned url을 반환합니다.' })
+  async downloadPdf(@Param('id') id: number) {
+    try {
+      return await this.journalService.getPdfPresignedUrl(id);
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      throw new HttpException('PDF presigned url 생성 중 서버 오류', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
   }
 }
