@@ -1,6 +1,9 @@
 fastapi
-uvicorn[standard]
+uvicorn
+openai
+docxtpl
 python-multipart
+python-dotenv
 transformers
 torch
 ffmpeg-python

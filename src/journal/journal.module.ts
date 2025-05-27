@@ -5,6 +5,8 @@ import { HttpModule } from '@nestjs/axios';
 import { JournalGateway } from './journal.gateway';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
+import { ConfigModule } from '@nestjs/config';
+import { S3Module } from '../s3/s3.module';
 
 @Module({
   imports: [
@@ -15,8 +17,11 @@ import { ConfigService } from '@nestjs/config';
       }),
       inject: [ConfigService],
     }),
+    ConfigModule,
+    S3Module,
   ],
   controllers: [JournalController],
   providers: [JournalService, JournalGateway, PrismaService],
+  exports: [JournalService],
 })
 export class JournalModule {}
