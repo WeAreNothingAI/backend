@@ -9,7 +9,8 @@ env:
   AWS_REGION: ap-northeast-2
   NEST_ECR_REPOSITORY: oncare
   PYTHON_ECR_REPOSITORY: oncare-python
-  ECS_SERVICE: oncare-service
+  ECS_NEST_SERVICE: oncare-service
+  ECS_PYTHON_SERVICE: oncare-service-lrkflr0l
   ECS_CLUSTER: oncare
   ECS_TASK_DEFINITION: .aws/task-definition.json
   NEST_CONTAINER_NAME: oncare
@@ -70,7 +71,7 @@ jobs:
           environment-variables: |
             DATABASE_URL=${{ secrets.DATABASE_URL }}
             AWS_S3_BUCKET_NAME=${{ secrets.AWS_S3_BUCKET_NAME }}
-            OPENAI_API_KEY =${{ secrets.OPENAI_API_KEY }}
+            OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
             AWS_ACCESS_KEY=${{ secrets.AWS_ACCESS_KEY }}
             AWS_SECRET_KEY=${{ secrets.AWS_SECRET_KEY }}
             AWS_REGION=${{ env.AWS_REGION }}
@@ -83,10 +84,18 @@ jobs:
             else .
           end)' ${{ steps.task-def.outputs.task-definition }} > updated-task-def.json
 
-      - name: Deploy to Amazon ECS
+      - name: Deploy to oncare-service
         uses: aws-actions/amazon-ecs-deploy-task-definition@v1
         with:
           task-definition: updated-task-def.json
-          service: ${{ env.ECS_SERVICE }}
+          service: ${{ env.ECS_NEST_SERVICE }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true
+
+      - name: Deploy to python-service
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        with:
+          task-definition: updated-task-def.json
+          service: ${{ env.ECS_PYTHON_SERVICE }}
           cluster: ${{ env.ECS_CLUSTER }}
           wait-for-service-stability: true
