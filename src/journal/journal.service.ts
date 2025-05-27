@@ -44,14 +44,9 @@ export class JournalService {
     private readonly configService: ConfigService,
     private readonly s3Service: S3Service,
   ) {
-    this.sttServerUrl = this.configService.get<string>(
-      'STT_SERVER_URL',
-      'http://python.service:5000/transcribe',
-    );
-    this.sttTimeout = this.configService.get<number>('STT_TIMEOUT', 30000);
-    this.logger.log(
-      `Initialized with STT_SERVER_URL: ${this.sttServerUrl}, STT_TIMEOUT: ${this.sttTimeout}`,
-    );
+    this.sttServerUrl = this.configService.get<string>('STT_SERVER_URL', 'http://python.service:5000/transcribe');
+    this.sttTimeout = this.configService.get<number>('STT_TIMEOUT', 60000);
+    this.logger.log(`Initialized with STT_SERVER_URL: ${this.sttServerUrl}, STT_TIMEOUT: ${this.sttTimeout}`);
   }
 
   async uploadAudioFile(file: Express.Multer.File): Promise<string> {
@@ -75,14 +70,18 @@ export class JournalService {
         this.logger.debug(`STT attempt ${attempt}/${this.maxRetries}`);
 
         const response = await firstValueFrom(
-          this.httpService.post(this.sttServerUrl, audioBuffer, {
-            headers: {
-              'Content-Type': 'audio/webm',
+          this.httpService.post(
+            this.sttServerUrl,
+            audioBuffer,
+            {
+              headers: {
+                'Content-Type': 'audio/webm',
+              },
+              timeout: 60000,
+              maxContentLength: Infinity,
+              maxBodyLength: Infinity,
             },
-            timeout: this.sttTimeout,
-            maxContentLength: Infinity,
-            maxBodyLength: Infinity,
-          }),
+          ),
         );
 
         if (!response.data || !response.data.text) {
@@ -133,7 +132,6 @@ export class JournalService {
     audioBuffer: Buffer;
     transcript: string;
     summary?: string | null;
-    issues?: string | null;
     recommendations?: string | null;
     opinion?: string | null;
     result?: string | null;
@@ -157,7 +155,6 @@ export class JournalService {
           rawAudioUrl,
           transcript: data.transcript,
           summary: data.summary ?? '',
-          issues: data.issues ?? '',
           recommendations: data.recommendations ?? '',
           opinion: data.opinion ?? '',
           result: data.result ?? '',
@@ -213,15 +210,19 @@ export class JournalService {
     const requestBody = mapJournalToRequest(journal);
 
     const { data } = await firstValueFrom(
-      this.httpService.post(
-        'http://python.service:5000/generate-journal-docx',
-        requestBody,
-      ),
+      this.httpService.post('http://python.service:5000/generate-journal-docx', requestBody, { timeout: 60000 })
     );
 
     const updated = await this.prisma.journal.update({
       where: { id: journal.id },
-      data: { exportedDocx: data.path },
+      data: {
+        exportedDocx: data.path,
+        summary: data.summary,
+        recommendations: data.recommendations,
+        opinion: data.opinion,
+        result: data.result,
+        note: data.note,
+      },
     });
 
     return { ...data, updated };

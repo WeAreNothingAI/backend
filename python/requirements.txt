@@ -4,6 +4,7 @@ openai
 docxtpl
 python-multipart
 python-dotenv
-transformers
+transformers==4.36.2
 torch
 ffmpeg-python
+pydub

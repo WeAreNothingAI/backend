@@ -61,3 +61,7 @@ journal-*.docx
 
 # python 캐시 파일
 __pycache__/
+
+# python 임시 파일
+temp/
+
