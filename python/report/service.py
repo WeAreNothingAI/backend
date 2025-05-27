@@ -2,12 +2,14 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 from docxtpl import DocxTemplate
 from fastapi.middleware.cors import CORSMiddleware
-import openai
+from openai import OpenAI
 import os
 import uuid
 from dotenv import load_dotenv
 import json
 import time
+
+client = OpenAI()
 
 class JournalRequest(BaseModel):
     text: str
@@ -27,7 +29,7 @@ class JournalRequest(BaseModel):
 
 def create_report_app() -> FastAPI:
     load_dotenv()
-    openai.api_key = os.getenv("OPENAI_API_KEY")
+    client.api_key = os.getenv("OPENAI_API_KEY")
 
     app = FastAPI()
 
@@ -54,7 +56,7 @@ def create_report_app() -> FastAPI:
             f"- GPT형 멘트(예: 요약해 드리겠습니다)는 쓰지 마세요. → ❌\n"
             f"- 한 문단으로 작성하며, 항목 구분이나 줄바꿈 없이 매끄럽게 연결된 문장으로 서술하세요."
         )
-        summary_response = openai.ChatCompletion.create(
+        summary_response = client.chat.completions.create(
             model="gpt-4.1",
             messages=[
                 {"role": "system", "content": summary_prompt},
@@ -88,7 +90,7 @@ def create_report_app() -> FastAPI:
             "}\n"
             "상담 대화:\n" + transcript
         )
-        meta_response = openai.ChatCompletion.create(
+        meta_response = client.chat.completions.create(
             model="gpt-4.1",
             messages=[{"role": "system", "content": meta_prompt}]
         )
