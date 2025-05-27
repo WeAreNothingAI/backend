@@ -49,7 +49,7 @@ jobs:
         run: |
           docker build --no-cache -f ./Dockerfile.nest -t $ECR_REGISTRY/${{ env.NEST_ECR_REPOSITORY }}:$IMAGE_TAG .
           docker push $ECR_REGISTRY/${{ env.NEST_ECR_REPOSITORY }}:$IMAGE_TAG
-          echo "::set-output name=image::$ECR_REGISTRY/${{ env.NEST_ECR_REPOSITORY }}:$IMAGE_TAG"
+          echo "image=$ECR_REGISTRY/${{ env.NEST_ECR_REPOSITORY }}:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
       - name: Build, tag, and push FastAPI image
         id: build-python-image
@@ -59,10 +59,10 @@ jobs:
         run: |
           docker build -f ./Dockerfile.python -t $ECR_REGISTRY/${{ env.PYTHON_ECR_REPOSITORY }}:$IMAGE_TAG .
           docker push $ECR_REGISTRY/${{ env.PYTHON_ECR_REPOSITORY }}:$IMAGE_TAG
-          echo "::set-output name=image::$ECR_REGISTRY/${{ env.PYTHON_ECR_REPOSITORY }}:$IMAGE_TAG"
+          echo "image=$ECR_REGISTRY/${{ env.PYTHON_ECR_REPOSITORY }}:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
-      - name: Fill in NestJS image in the ECS task definition
-        id: task-def
+      - name: Render NestJS container in task definition
+        id: render-nest
         uses: aws-actions/amazon-ecs-render-task-definition@v1
         with:
           task-definition: ${{ env.ECS_TASK_DEFINITION }}
@@ -76,18 +76,24 @@ jobs:
             AWS_SECRET_KEY=${{ secrets.AWS_SECRET_KEY }}
             AWS_REGION=${{ env.AWS_REGION }}
 
-      - name: Update Python container image in task definition
-        run: |
-          jq '.containerDefinitions |= map(
-            if .name == "${{ env.PYTHON_CONTAINER_NAME }}"
-            then .image = "${{ steps.build-python-image.outputs.image }}"
-            else .
-          end)' ${{ steps.task-def.outputs.task-definition }} > updated-task-def.json
+      - name: Render Python container in task definition
+        id: render-python
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: ${{ steps.render-nest.outputs.task-definition }}
+          container-name: ${{ env.PYTHON_CONTAINER_NAME }}
+          image: ${{ steps.build-python-image.outputs.image }}
+          environment-variables: |
+            DATABASE_URL=${{ secrets.DATABASE_URL }}
+            OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+            AWS_ACCESS_KEY=${{ secrets.AWS_ACCESS_KEY }}
+            AWS_SECRET_KEY=${{ secrets.AWS_SECRET_KEY }}
+            AWS_REGION=${{ env.AWS_REGION }}
 
       - name: Deploy to oncare-service
         uses: aws-actions/amazon-ecs-deploy-task-definition@v1
         with:
-          task-definition: updated-task-def.json
+          task-definition: ${{ steps.render-python.outputs.task-definition }}
           service: ${{ env.ECS_NEST_SERVICE }}
           cluster: ${{ env.ECS_CLUSTER }}
           wait-for-service-stability: true
@@ -95,7 +101,7 @@ jobs:
       - name: Deploy to python-service
         uses: aws-actions/amazon-ecs-deploy-task-definition@v1
         with:
-          task-definition: updated-task-def.json
+          task-definition: ${{ steps.render-python.outputs.task-definition }}
           service: ${{ env.ECS_PYTHON_SERVICE }}
           cluster: ${{ env.ECS_CLUSTER }}
           wait-for-service-stability: true
