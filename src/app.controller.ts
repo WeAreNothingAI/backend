@@ -2,10 +2,19 @@ import { Controller, Get } from '@nestjs/common';
 import { HttpException } from '@nestjs/common/exceptions';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
+import { AppService } from './app.service';
 
 @Controller()
 export class AppController {
-  constructor(private readonly httpService: HttpService) {}
+  constructor(
+    private readonly httpService: HttpService,
+    private readonly appService: AppService,
+  ) {}
+
+  @Get()
+  getHello(): string {
+    return this.appService.getHello();
+  }
 
   @Get('ping-whisper')
   async pingWhisper() {
