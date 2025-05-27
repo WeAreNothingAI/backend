@@ -77,13 +77,20 @@ jobs:
             AWS_REGION=${{ env.AWS_REGION }}
 
       - name: Update Python container image and env vars in task definition
+        env:
+          PY_IMAGE: ${{ steps.build-python-image.outputs.image }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          AWS_REGION: ${{ env.AWS_REGION }}
         run: |
-          jq '.containerDefinitions |= map(
-            if .name == "${{ env.PYTHON_CONTAINER_NAME }}" then
-              .image = "${{ steps.build-python-image.outputs.image }}" |
+          jq --arg image "$PY_IMAGE" \
+             --arg openai_key "$OPENAI_API_KEY" \
+             --arg region "$AWS_REGION" \
+          '.containerDefinitions |= map(
+            if .name == "whisper" then
+              .image = $image |
               .environment += [
-                {"name": "OPENAI_API_KEY", "value": "${{ secrets.OPENAI_API_KEY }}"},
-                {"name": "AWS_REGION", "value": "${{ env.AWS_REGION }}"}
+                {"name": "OPENAI_API_KEY", "value": $openai_key},
+                {"name": "AWS_REGION", "value": $region}
               ]
             else . end
           )' ${{ steps.render-nest.outputs.task-definition }} > updated-task-def.json
