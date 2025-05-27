@@ -1,6 +1,7 @@
-from fastapi import APIRouter
+from fastapi import FastAPI
 from pydantic import BaseModel
 from docxtpl import DocxTemplate
+from fastapi.middleware.cors import CORSMiddleware
 import openai
 import os
 import uuid
@@ -24,6 +25,9 @@ class JournalRequest(BaseModel):
     result: str = ""    
     note: str = ""
 
+def create_report_app() -> FastAPI:
+    load_dotenv()
+    openai.api_key = os.getenv("OPENAI_API_KEY")
 
     app = FastAPI()
 
@@ -116,4 +120,4 @@ class JournalRequest(BaseModel):
             "note": meta_json["비고"]
         }
 
-    return app
+    return app 
