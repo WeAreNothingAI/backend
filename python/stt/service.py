@@ -1,4 +1,5 @@
-from fastapi import Request, APIRouter
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import JSONResponse
 import tempfile
 import os
@@ -25,48 +26,60 @@ pipe = pipeline(
     device=-1
 )
 
-@app.options("/transcribe")
-async def transcribe_options():
-    return JSONResponse(
-        content={},
-        headers={
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Headers": "*",
-        },
+def create_stt_app() -> FastAPI:
+    app = FastAPI()
+
+    # CORS 설정
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+        expose_headers=["*"],
     )
 
+    @app.options("/")
+    async def transcribe_options():
+        return JSONResponse(
+            content={},
+            headers={
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Headers": "*",
+            },
+        )
 
-@app.post("/")
+    @app.post("/")
     async def transcribe_buffer(request: Request):
         temp_file = None
         start_time = time.time()  # 처리 시간 측정 시작
         try:
-            temp_dir = os.path.join(os.getcwd(), 'temp')
-            os.makedirs(temp_dir, exist_ok=True)
-        except Exception:
-            temp_dir = tempfile.gettempdir()
+            content = await request.body()
+            content_size = len(content)
 
-        # 오디오 파일 저장
-        try:
-            temp_file = os.path.join(temp_dir, f'audio_{os.getpid()}_{id(content)}.webm')
-            with open(temp_file, 'wb') as f:
-                f.write(content)
-                f.flush()
-                os.fsync(f.fileno())
-        except Exception as e:
-            traceback.print_exc()
-            raise Exception("오디오 데이터를 임시 파일로 저장하는 중 오류가 발생했습니다.")
+            if content_size == 0:
+                raise Exception("빈 오디오 데이터를 받았습니다.")
 
-        if not os.path.exists(temp_file) or os.path.getsize(temp_file) == 0:
-            raise Exception("유효한 오디오 파일이 생성되지 않았습니다.")
+            # 임시 디렉토리 설정
+            try:
+                temp_dir = os.path.join(os.getcwd(), 'temp')
+                os.makedirs(temp_dir, exist_ok=True)
+            except Exception:
+                temp_dir = tempfile.gettempdir()
 
-        # Whisper로 음성 인식
-        try:
-            result = pipe(temp_file)
-            transcribed_text = result["text"].strip()
+            # 오디오 파일 저장
+            try:
+                temp_file = os.path.join(temp_dir, f'audio_{os.getpid()}_{id(content)}.webm')
+                with open(temp_file, 'wb') as f:
+                    f.write(content)
+                    f.flush()
+                    os.fsync(f.fileno())
+            except Exception as e:
+                traceback.print_exc()
+                raise Exception("오디오 데이터를 임시 파일로 저장하는 중 오류가 발생했습니다.")
 
-            if not transcribed_text:
-                raise Exception("음성 인식 결과가 비어있습니다.")
+            if not os.path.exists(temp_file) or os.path.getsize(temp_file) == 0:
+                raise Exception("유효한 오디오 파일이 생성되지 않았습니다.")
 
             # webm 오디오를 20초씩 분할하여 Whisper로 각각 처리
             try:
@@ -117,9 +130,4 @@ async def transcribe_options():
                 traceback.print_exc()
     # ffmpeg가 시스템에 설치되어 있어야 webm → wav 변환이 정상 동작합니다.
 
-    finally:
-        try:
-            if temp_file and os.path.exists(temp_file):
-                os.remove(temp_file)
-        except Exception:
-            traceback.print_exc()
+    return app 
