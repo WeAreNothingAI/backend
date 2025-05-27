@@ -76,7 +76,7 @@ jobs:
             AWS_SECRET_KEY=${{ secrets.AWS_SECRET_KEY }}
             AWS_REGION=${{ env.AWS_REGION }}
 
-      - name: Update Python container image and env vars in task definition
+      - name: Update Python container image and environment variables in task definition
         env:
           PY_IMAGE: ${{ steps.build-python-image.outputs.image }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -98,7 +98,7 @@ jobs:
       - name: Deploy to oncare-service
         uses: aws-actions/amazon-ecs-deploy-task-definition@v1
         with:
-          task-definition: ${{ steps.render-python.outputs.task-definition }}
+          task-definition: updated-task-def.json
           service: ${{ env.ECS_NEST_SERVICE }}
           cluster: ${{ env.ECS_CLUSTER }}
           wait-for-service-stability: true
@@ -106,7 +106,7 @@ jobs:
       - name: Deploy to python-service
         uses: aws-actions/amazon-ecs-deploy-task-definition@v1
         with:
-          task-definition: ${{ steps.render-python.outputs.task-definition }}
+          task-definition: updated-task-def.json
           service: ${{ env.ECS_PYTHON_SERVICE }}
           cluster: ${{ env.ECS_CLUSTER }}
           wait-for-service-stability: true
