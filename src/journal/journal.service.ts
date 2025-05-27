@@ -126,7 +126,6 @@ export class JournalService {
     audioBuffer: Buffer;
     transcript: string;
     summary?: string | null;
-    issues?: string | null;
     recommendations?: string | null;
     opinion?: string | null;
     result?: string | null;
@@ -147,7 +146,6 @@ export class JournalService {
           rawAudioUrl,
           transcript: data.transcript,
           summary: data.summary ?? '',
-          issues: data.issues ?? '',
           recommendations: data.recommendations ?? '',
           opinion: data.opinion ?? '',
           result: data.result ?? '',

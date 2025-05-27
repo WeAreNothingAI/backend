@@ -121,7 +121,6 @@ model Journal {
   rawAudioUrl     String
   transcript      String
   summary         String?
-  issues          String?
   recommendations String?
   opinion         String?
   result          String?
