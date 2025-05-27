@@ -5,9 +5,9 @@ import { JournalModule } from './journal/journal.module';
 import { ReportModule } from './report/report.module';
 import { ConfigModule } from '@nestjs/config';
 import { S3Module } from './s3/s3.module';
+import { HttpModule } from '@nestjs/axios';
 
 @Module({
-
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
@@ -15,6 +15,7 @@ import { S3Module } from './s3/s3.module';
     }),
     JournalModule,
     S3Module,
+    HttpModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -46,7 +46,7 @@ export class JournalService {
   ) {
     this.sttServerUrl = this.configService.get<string>(
       'STT_SERVER_URL',
-      'http://whisper:5000/transcribe',
+      'http://python.python.local:5000/transcribe',
     );
     this.sttTimeout = this.configService.get<number>('STT_TIMEOUT', 30000);
     this.logger.log(
@@ -61,7 +61,9 @@ export class JournalService {
       return url;
     } catch (error) {
       this.logger.error('Error uploading audio file to S3:', error);
-      throw new InternalServerErrorException('오디오 파일 업로드 중 오류가 발생했습니다.');
+      throw new InternalServerErrorException(
+        '오디오 파일 업로드 중 오류가 발생했습니다.',
+      );
     }
   }
 
@@ -121,7 +123,7 @@ export class JournalService {
       path: '',
       stream: null as any,
     };
-    
+
     return await this.s3Service.uploadAudio(file, filename);
   }
 
@@ -141,8 +143,11 @@ export class JournalService {
   }) {
     try {
       const filename = `audio_${data.clientId}_${Date.now()}.webm`;
-      const rawAudioUrl = await this.uploadAudioBuffer(data.audioBuffer, filename);
-      
+      const rawAudioUrl = await this.uploadAudioBuffer(
+        data.audioBuffer,
+        filename,
+      );
+
       this.logger.debug('Creating journal entry with audio URL:', rawAudioUrl);
 
       const result = await this.prisma.journal.create({
@@ -174,22 +179,27 @@ export class JournalService {
     }
   }
 
-  async generateJournalDocx(journalData: any): Promise<GenerateJournalDocxResponseDto> {
+  async generateJournalDocx(
+    journalData: any,
+  ): Promise<GenerateJournalDocxResponseDto> {
     try {
       const response = await firstValueFrom(
         this.httpService.post(
-          'http://whisper:5000/generate-journal-docx', // python-report FastAPI 주소
+          'http://python.python.local:5000/generate-journal-docx', // python-report FastAPI 주소
           journalData,
           {
             headers: { 'Content-Type': 'application/json' },
             timeout: 60000,
           },
-        )
+        ),
       );
       return response.data as GenerateJournalDocxResponseDto; // { file, path } 등 반환
     } catch (error) {
       this.logger.error('python-report 호출 중 오류:', error);
-      throw new InternalServerErrorException('문서 생성 중 오류가 발생했습니다.', error.message);
+      throw new InternalServerErrorException(
+        '문서 생성 중 오류가 발생했습니다.',
+        error.message,
+      );
     }
   }
 
@@ -203,7 +213,10 @@ export class JournalService {
     const requestBody = mapJournalToRequest(journal);
 
     const { data } = await firstValueFrom(
-      this.httpService.post('http://whisper:5000/generate-journal-docx', requestBody)
+      this.httpService.post(
+        'http://python.python.local:5000/generate-journal-docx',
+        requestBody,
+      ),
     );
 
     const updated = await this.prisma.journal.update({
