@@ -83,13 +83,12 @@ model Client {
 
   // Relations
   careWorker      Member       @relation("CareWorkerClients", fields: [careWorkerId], references: [id], onDelete: Cascade)
-  journals        Journal[]
 }
 
 model Work {
   id          Int       @id @default(autoincrement())
   memberId    Int
-  date        DateTime
+  workDate    DateTime  @db.Date
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
@@ -97,14 +96,14 @@ model Work {
   member      Member    @relation(fields: [memberId], references: [id])
   events      WorkEvent[]
 
-  @@unique([memberId, date])
+  @@unique([memberId, workDate])
 }
 
 model WorkEvent {
   id          Int           @id @default(autoincrement())
   workId      Int
   type        WorkEventType
-  time        DateTime
+  workTime    DateTime      @db.Time
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
