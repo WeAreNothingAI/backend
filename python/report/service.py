@@ -1,11 +1,13 @@
-from fastapi import FastAPI
+from fastapi import APIRouter
 from pydantic import BaseModel
 from docxtpl import DocxTemplate
-from fastapi.middleware.cors import CORSMiddleware
 import openai
 import os
 import uuid
-from dotenv import load_dotenv
+
+openai.api_key = os.getenv("OPENAI_API_KEY")
+
+router = APIRouter()
 
 class JournalRequest(BaseModel):
     text: str
@@ -23,22 +25,9 @@ class JournalRequest(BaseModel):
     result: str = ""    
     note: str = ""
 
-def create_report_app() -> FastAPI:
-    load_dotenv()
-    openai.api_key = os.getenv("OPENAI_API_KEY")
 
-    app = FastAPI()
-
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
-
-    @app.post("/")
-    def generate_journal_docx(data: JournalRequest):
+@router.post("/")
+def generate_journal_docx(data: JournalRequest):
         # 1. 상담내용 요약 GPT 호출
         response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
@@ -114,5 +103,3 @@ def create_report_app() -> FastAPI:
             "file": filename,
             "path": filepath
         }
-
-    return app 

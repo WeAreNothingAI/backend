@@ -1,13 +1,14 @@
-import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from stt.service import create_stt_app
-from report.service import create_report_app
+from dotenv import load_dotenv
+from report.service import router as report_router
+from stt.service import router as stt_router
 
 def create_app() -> FastAPI:
+    load_dotenv()
+
     app = FastAPI()
-    
-    # CORS 설정
+
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
@@ -16,13 +17,9 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    # STT 서비스 마운트
-    stt_app = create_stt_app()
-    app.mount("/transcribe", stt_app)
-
-    # 리포트 서비스 마운트
-    report_app = create_report_app()
-    app.mount("/generate-journal-docx", report_app)
+    # 라우터 등록
+    app.include_router(report_router)
+    app.include_router(stt_router)
 
     return app
 
@@ -33,4 +30,5 @@ def read_root():
     return {"message": "Hello World"}
 
 if __name__ == "__main__":
+    import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=5000)
