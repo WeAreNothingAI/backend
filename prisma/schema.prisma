@@ -83,6 +83,7 @@ model Client {
 
   // Relations
   careWorker      Member       @relation("CareWorkerClients", fields: [careWorkerId], references: [id], onDelete: Cascade)
+  journals        Journal[]
 }
 
 model Work {
@@ -96,7 +97,6 @@ model Work {
   member      Member    @relation(fields: [memberId], references: [id])
   events      WorkEvent[]
 
-  @@unique([memberId, workDate])
 }
 
 model WorkEvent {
