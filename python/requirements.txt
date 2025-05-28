@@ -8,3 +8,5 @@ transformers==4.36.2
 torch
 ffmpeg-python
 pydub
+boto3
+docx2pdf

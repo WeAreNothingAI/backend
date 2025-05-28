@@ -1,4 +1,4 @@
-import { Injectable, Logger, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, Logger, InternalServerErrorException, HttpException } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import { PrismaService } from '../prisma/prisma.service';
@@ -202,7 +202,8 @@ export class JournalService {
     const updated = await this.prisma.journal.update({
       where: { id: journal.id },
       data: {
-        exportedDocx: data.path,
+        exportedDocx: data.docx_url,
+        exportedPdf: data.pdf_url,
         summary: data.summary,
         recommendations: data.recommendations,
         opinion: data.opinion,
@@ -211,6 +212,74 @@ export class JournalService {
       },
     });
 
-    return { ...data, updated };
+    return {
+      file: data.file,
+      docx_url: data.docx_url,
+      pdf_url: data.pdf_url,
+      summary: data.summary,
+      recommendations: data.recommendations,
+      opinion: data.opinion,
+      result: data.result,
+      note: data.note,
+      updated,
+    };
+  }
+
+  async convertJournalPdf(id: number) {
+    try {
+      // 1. DB에서 docx 파일명 조회
+      const journal = await this.prisma.journal.findUnique({
+        where: { id: Number(id) },
+      });
+      if (!journal || !journal.exportedDocx) throw new Error('docx 파일이 존재하지 않습니다.');
+
+      // 2. docx 파일명 추출 (S3 URL 또는 Key에서 파일명만 추출)
+      let fileName = journal.exportedDocx as string;
+      if (fileName.includes('/')) fileName = fileName.split('/').pop() as string;
+
+      // 3. Python 서버에 PDF 변환 요청
+      const { data } = await firstValueFrom(
+        this.httpService.post('http://127.0.0.1:5000/generate-journal-docx/convert-journal-pdf', { file_name: fileName }, { timeout: 60000 })
+      );
+
+      // 4. DB에 pdf_url 저장
+      await this.prisma.journal.update({
+        where: { id: journal.id },
+        data: { exportedPdf: data.pdf_url },
+      });
+
+      // 5. pdf_url 반환
+      return { pdf_url: data.pdf_url };
+    } catch (error) {
+      const msg = error?.response?.data?.detail || error.message || 'PDF 변환 중 오류가 발생했습니다.';
+      const status = error?.status || error?.response?.status || 500;
+      throw new HttpException(msg, status);
+    }
+  }
+
+  async getDocxPresignedUrl(id: number) {
+    // 1. DB에서 docx 파일명(S3 Key) 조회
+    const journal = await this.prisma.journal.findUnique({ where: { id: Number(id) } });
+    if (!journal || !journal.exportedDocx) throw new Error('docx 파일이 존재하지 않습니다.');
+    let fileName = journal.exportedDocx as string;
+    if (fileName.includes('/')) fileName = fileName.split('/').pop() as string;
+    // 2. Python 서버 presigned url API 호출
+    const { data } = await firstValueFrom(
+      this.httpService.post('http://127.0.0.1:5000/generate-journal-docx/download-docx-url', { file_name: fileName }, { timeout: 10000 })
+    );
+    return data;
+  }
+
+  async getPdfPresignedUrl(id: number) {
+    // 1. DB에서 pdf 파일명(S3 Key) 조회
+    const journal = await this.prisma.journal.findUnique({ where: { id: Number(id) } });
+    if (!journal || !journal.exportedPdf) throw new Error('pdf 파일이 존재하지 않습니다.');
+    let fileName = journal.exportedPdf as string;
+    if (fileName.includes('/')) fileName = fileName.split('/').pop() as string;
+    // 2. Python 서버 presigned url API 호출
+    const { data } = await firstValueFrom(
+      this.httpService.post('http://127.0.0.1:5000/generate-journal-docx/download-pdf-url', { file_name: fileName }, { timeout: 10000 })
+    );
+    return data;
   }
 }

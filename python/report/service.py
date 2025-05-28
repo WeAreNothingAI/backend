@@ -1,13 +1,20 @@
-from fastapi import FastAPI
+import os
+from fastapi import FastAPI, Body, HTTPException
 from pydantic import BaseModel
 from docxtpl import DocxTemplate
 from fastapi.middleware.cors import CORSMiddleware
 import openai
-import os
 import uuid
-from dotenv import load_dotenv
 import json
 import time
+from docx2pdf import convert
+import boto3
+import tempfile
+
+# 개발 환경에서만 dotenv 사용
+if os.environ.get("ENV", "local") == "local":
+    from dotenv import load_dotenv
+    load_dotenv(dotenv_path=os.path.abspath(os.path.join(os.path.dirname(__file__), '../../.env')))
 
 class JournalRequest(BaseModel):
     text: str
@@ -25,12 +32,16 @@ class JournalRequest(BaseModel):
     result: str = ""    
     note: str = ""
 
+class PdfConvertRequest(BaseModel):
+    file_name: str
+
+class FileDownloadRequest(BaseModel):
+    file_name: str
+
+
 def create_report_app() -> FastAPI:
-    load_dotenv()
     openai.api_key = os.getenv("OPENAI_API_KEY")
-
     app = FastAPI()
-
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
@@ -107,17 +118,86 @@ def create_report_app() -> FastAPI:
         os.makedirs("generated", exist_ok=True)
         tpl.save(filepath)
 
+        # 5-1. docx -> pdf 변환
+        pdf_filename = filename.replace('.docx', '.pdf')
+        pdf_filepath = filepath.replace('.docx', '.pdf')
+        convert(filepath, pdf_filepath)
+
+        BUCKET_NAME = 'oncare-backend'
+        s3 = boto3.client('s3')
+        docx_s3_key = f"journal/docx/{filename}"
+        pdf_s3_key = f"journal/pdf/{pdf_filename}"
+        s3.upload_file(filepath, BUCKET_NAME, docx_s3_key)
+        s3.upload_file(pdf_filepath, BUCKET_NAME, pdf_s3_key)
+        docx_url = f"https://{BUCKET_NAME}.s3.amazonaws.com/{docx_s3_key}"
+        pdf_url = f"https://{BUCKET_NAME}.s3.amazonaws.com/{pdf_s3_key}"
+
+        # 5-3. (선택) 로컬 파일 삭제
+        os.remove(filepath)
+        os.remove(pdf_filepath)
+
         # 6. 응답
         end = time.time()
         print(f"문서 생성 처리 시간: {end - start:.2f}초")
         return {
             "file": filename,
-            "path": filepath,
+            "docx_url": docx_url,
+            "pdf_url": pdf_url,
             "summary": summary,
             "recommendations": meta_json["조치사항"],
             "opinion": meta_json["상담자의견"],
             "result": meta_json["상담결과"],
             "note": meta_json["비고"]
         }
+
+    @app.post("/convert-journal-pdf")
+    def convert_journal_pdf(req: PdfConvertRequest):
+        file_name = req.file_name
+        BUCKET_NAME = 'oncare-backend'
+        s3 = boto3.client('s3')
+        docx_s3_key = f"journal/docx/{file_name}"
+        pdf_file_name = file_name.replace('.docx', '.pdf')
+        pdf_s3_key = f"journal/pdf/{pdf_file_name}"
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                docx_path = os.path.join(tmpdir, file_name)
+                pdf_path = os.path.join(tmpdir, pdf_file_name)
+                # 1. S3에서 docx 다운로드
+                s3.download_file(BUCKET_NAME, docx_s3_key, docx_path)
+                # 2. 변환
+                convert(docx_path, pdf_path)
+                # 3. S3 업로드
+                s3.upload_file(pdf_path, BUCKET_NAME, pdf_s3_key)
+                pdf_url = f"https://{BUCKET_NAME}.s3.amazonaws.com/{pdf_s3_key}"
+            return {"pdf_url": pdf_url}
+        except Exception as e:
+            import traceback
+            print(f"[PDF 변환/업로드 오류] {e}")
+            traceback.print_exc()
+            raise HTTPException(status_code=500, detail=f"PDF 변환/업로드 중 오류: {str(e)}")
+
+    @app.post("/download-docx-url")
+    def get_docx_download_url(req: FileDownloadRequest):
+        BUCKET_NAME = 'oncare-backend'
+        s3 = boto3.client('s3')
+        docx_s3_key = f"journal/docx/{req.file_name}"
+        url = s3.generate_presigned_url(
+            ClientMethod='get_object',
+            Params={'Bucket': BUCKET_NAME, 'Key': docx_s3_key},
+            ExpiresIn=60 * 10  # 10분
+        )
+        return {"download_url": url}
+
+    @app.post("/download-pdf-url")
+    def get_pdf_download_url(req: FileDownloadRequest):
+        BUCKET_NAME = 'oncare-backend'
+        s3 = boto3.client('s3')
+        pdf_s3_key = f"journal/pdf/{req.file_name}"
+        url = s3.generate_presigned_url(
+            ClientMethod='get_object',
+            Params={'Bucket': BUCKET_NAME, 'Key': pdf_s3_key},
+            ExpiresIn=60 * 10  # 10분
+        )
+        return {"download_url": url}
 
     return app 
