@@ -11,4 +11,9 @@ export class WorkController {
   async postWorkIn(@Param('id', ParseIntPipe) memberId: number) {
     return await this.workService.createWorkIn(memberId);
   }
+
+  @Post('end/:id')
+  async postWorkOut(@Param('id', ParseIntPipe) memberId: number) {
+    return await this.workService.createWorkOut(memberId);
+  }
 }
