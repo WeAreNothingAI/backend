@@ -253,7 +253,11 @@ export class JournalService {
     } catch (error) {
       const msg = error?.response?.data?.detail || error.message || 'PDF 변환 중 오류가 발생했습니다.';
       const status = error?.status || error?.response?.status || 500;
-      throw new HttpException(msg, status);
+      // OS별 안내 메시지 추가
+      let osHint = '';
+      if (msg.includes('docx2pdf')) osHint = ' (윈도우 환경: Microsoft Word 및 docx2pdf 패키지가 필요합니다)';
+      if (msg.includes('LibreOffice')) osHint = ' (리눅스 환경: LibreOffice가 설치되어 있어야 합니다)';
+      throw new HttpException(msg + osHint, status);
     }
   }
 
