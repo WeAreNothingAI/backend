@@ -97,7 +97,6 @@ model Work {
   member      Member    @relation(fields: [memberId], references: [id])
   events      WorkEvent[]
 
-  @@unique([memberId, workDate])
 }
 
 model WorkEvent {
