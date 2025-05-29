@@ -6,6 +6,7 @@ import { ReportModule } from './report/report.module';
 import { ConfigModule } from '@nestjs/config';
 import { S3Module } from './s3/s3.module';
 import { HttpModule } from '@nestjs/axios';
+import { WorkModule } from './work/work.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { HttpModule } from '@nestjs/axios';
     JournalModule,
     S3Module,
     HttpModule,
+    WorkModule,
   ],
   controllers: [AppController],
   providers: [AppService],
