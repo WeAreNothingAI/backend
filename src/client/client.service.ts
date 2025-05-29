@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateClientDto } from './dto/create-client.dto';
 
@@ -18,5 +22,35 @@ export class ClientService {
     return await this.prisma.client.create({
       data: { gender, ...otherData, birthDate: parsedDate },
     });
+  }
+
+  async fetchManyClient(socialWorkerId?: number, careWorkerId?: number) {
+    const orConditions: any[] = [];
+
+    if (socialWorkerId !== undefined) {
+      orConditions.push({ socialWorkerId });
+    }
+
+    if (careWorkerId !== undefined) {
+      orConditions.push({
+        careWorkerId,
+      });
+    }
+
+    return await this.prisma.client.findMany({
+      where: {
+        OR: orConditions,
+      },
+    });
+  }
+
+  async fetchClient(id: number) {
+    const client = await this.prisma.client.findUnique({ where: { id } });
+
+    if (!client) {
+      throw new NotFoundException('해당 노인은 존재하지 않습니다.');
+    }
+
+    return client;
   }
 }
