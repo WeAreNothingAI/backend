@@ -136,14 +136,26 @@ def create_report_app() -> FastAPI:
         meta_json["상담내용"] = summary
 
         # 4. 템플릿 렌더링
-        tpl = DocxTemplate("상담일지양식.docx")
-        tpl.render(meta_json)
+        try:
+            tpl = DocxTemplate("상담일지양식.docx")
+            tpl.render(meta_json)
+        except Exception as e:
+            print("[템플릿 렌더링 에러]", str(e))
+            import traceback
+            traceback.print_exc()
+            raise HTTPException(status_code=500, detail=f"템플릿 렌더링 중 오류: {str(e)}")
 
         # 5. 저장
         filename = f"journal-{uuid.uuid4()}.docx"
         filepath = f"./generated/{filename}"
         os.makedirs("generated", exist_ok=True)
-        tpl.save(filepath)
+        try:
+            tpl.save(filepath)
+        except Exception as e:
+            print("[파일 저장 에러]", str(e))
+            import traceback
+            traceback.print_exc()
+            raise HTTPException(status_code=500, detail=f"docx 파일 저장 중 오류: {str(e)}")
 
         # 5-1. docx -> pdf 변환
         pdf_filename = filename.replace('.docx', '.pdf')
@@ -160,8 +172,20 @@ def create_report_app() -> FastAPI:
         s3 = boto3.client('s3')
         docx_s3_key = f"journal/docx/{filename}"
         pdf_s3_key = f"journal/pdf/{pdf_filename}"
-        s3.upload_file(filepath, BUCKET_NAME, docx_s3_key)
-        s3.upload_file(pdf_filepath, BUCKET_NAME, pdf_s3_key)
+        try:
+            s3.upload_file(filepath, BUCKET_NAME, docx_s3_key)
+        except Exception as e:
+            print("[S3 업로드 중 에러 - DOCX]", str(e))
+            import traceback
+            traceback.print_exc()
+            raise HTTPException(status_code=500, detail=f"S3 DOCX 업로드 중 오류: {str(e)}")
+        try:
+            s3.upload_file(pdf_filepath, BUCKET_NAME, pdf_s3_key)
+        except Exception as e:
+            print("[S3 업로드 중 에러 - PDF]", str(e))
+            import traceback
+            traceback.print_exc()
+            raise HTTPException(status_code=500, detail=f"S3 PDF 업로드 중 오류: {str(e)}")
         docx_url = f"https://{BUCKET_NAME}.s3.amazonaws.com/{docx_s3_key}"
         pdf_url = f"https://{BUCKET_NAME}.s3.amazonaws.com/{pdf_s3_key}"
 
