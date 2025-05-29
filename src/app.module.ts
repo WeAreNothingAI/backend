@@ -6,9 +6,9 @@ import { ReportModule } from './report/report.module';
 import { ConfigModule } from '@nestjs/config';
 import { S3Module } from './s3/s3.module';
 import { WorkModule } from './work/work.module';
+import { ClientModule } from './client/client.module';
 
 @Module({
-
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
@@ -17,6 +17,7 @@ import { WorkModule } from './work/work.module';
     JournalModule,
     S3Module,
     WorkModule,
+    ClientModule,
   ],
   controllers: [AppController],
   providers: [AppService],
