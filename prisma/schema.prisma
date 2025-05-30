@@ -46,6 +46,7 @@ model Member {
   reportsAsCSocialWorker Report[]     @relation("Reports_SocialWorker")
   reportsAsCareWorker  Report[]     @relation("Reports_CareWorker")
   clients           Client[]        @relation("CareWorkerClients")
+  initialClients    Client[]        @relation("SocialWorkerClients")
 }
 
 model ManageMember {
@@ -71,19 +72,22 @@ model SocialAccount {
 model Client {
   id              Int        @id @default(autoincrement())
   name            String
-  birthDate       DateTime
+  birthDate       DateTime   @db.Date
   gender          String
+  planningTime    String
   address         String?
   contact         String?
   guardianContact String?
-  careWorkerId    Int
+  careWorkerId    Int?
+  socialWorkerId  Int
   notes           String?
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
 
   // Relations
-  careWorker      Member       @relation("CareWorkerClients", fields: [careWorkerId], references: [id], onDelete: Cascade)
+  careWorker      Member?      @relation("CareWorkerClients", fields: [careWorkerId], references: [id], onDelete: Cascade)
   journals        Journal[]
+  socialWorker    Member       @relation("SocialWorkerClients", fields: [socialWorkerId], references: [id], onDelete: Cascade)
 }
 
 model Work {
@@ -96,7 +100,6 @@ model Work {
   // Relations
   member      Member    @relation(fields: [memberId], references: [id])
   events      WorkEvent[]
-
 }
 
 model WorkEvent {
