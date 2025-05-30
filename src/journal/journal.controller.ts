@@ -1,7 +1,20 @@
-import { Controller, Post, Param, HttpCode, HttpException, HttpStatus } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Param,
+  HttpCode,
+  HttpException,
+  HttpStatus,
+  UseInterceptors,
+  UploadedFile,
+} from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { JournalService } from './journal.service';
-import { GenerateJournalDocxResponseDto, GenerateJournalPdfResponseDto } from './dto/generate-journal-docx-response.dto';
+import {
+  GenerateJournalDocxResponseDto,
+  GenerateJournalPdfResponseDto,
+} from './dto/generate-journal-docx-response.dto';
+import { FileInterceptor } from '@nestjs/platform-express';
 
 @ApiTags('journal')
 @Controller('journal')
@@ -13,7 +26,8 @@ export class JournalController {
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({
     summary: '상담 일지 요약 및 문서 생성',
-    description: 'DB에 저장된 transcript를 기반으로 python-report를 호출해 상담일지(docx)를 생성합니다.',
+    description:
+      'DB에 저장된 transcript를 기반으로 python-report를 호출해 상담일지(docx)를 생성합니다.',
   })
   @ApiResponse({
     status: HttpStatus.CREATED,
@@ -28,13 +42,18 @@ export class JournalController {
     status: HttpStatus.INTERNAL_SERVER_ERROR,
     description: '서버 오류',
   })
-  async summarizeJournal(@Param('id') id: number): Promise<GenerateJournalDocxResponseDto> {
+  async summarizeJournal(
+    @Param('id') id: number,
+  ): Promise<GenerateJournalDocxResponseDto> {
     try {
       const result = await this.journalService.summarizeJournal(id);
       return result;
     } catch (error) {
       if (error instanceof HttpException) throw error;
-      throw new HttpException('상담일지 요약 생성 중 서버 오류', HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new HttpException(
+        '상담일지 요약 생성 중 서버 오류',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 
@@ -54,38 +73,61 @@ export class JournalController {
     status: HttpStatus.INTERNAL_SERVER_ERROR,
     description: '서버 오류',
   })
-  async convertJournalPdf(@Param('id') id: number): Promise<GenerateJournalPdfResponseDto> {
+  async convertJournalPdf(
+    @Param('id') id: number,
+  ): Promise<GenerateJournalPdfResponseDto> {
     try {
       return await this.journalService.convertJournalPdf(id);
     } catch (error) {
       if (error instanceof HttpException) throw error;
-      throw new HttpException('PDF 변환 중 서버 오류', HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new HttpException(
+        'PDF 변환 중 서버 오류',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 
   // DOCX presigned url 반환
   @Post(':id/download-docx')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'DOCX presigned url 반환', description: 'S3에 업로드된 docx presigned url을 반환합니다.' })
+  @ApiOperation({
+    summary: 'DOCX presigned url 반환',
+    description: 'S3에 업로드된 docx presigned url을 반환합니다.',
+  })
   async downloadDocx(@Param('id') id: number) {
     try {
       return await this.journalService.getDocxPresignedUrl(id);
     } catch (error) {
       if (error instanceof HttpException) throw error;
-      throw new HttpException('DOCX presigned url 생성 중 서버 오류', HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new HttpException(
+        'DOCX presigned url 생성 중 서버 오류',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 
   // PDF presigned url 반환
   @Post(':id/download-pdf')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'PDF presigned url 반환', description: 'S3에 업로드된 pdf presigned url을 반환합니다.' })
+  @ApiOperation({
+    summary: 'PDF presigned url 반환',
+    description: 'S3에 업로드된 pdf presigned url을 반환합니다.',
+  })
   async downloadPdf(@Param('id') id: number) {
     try {
       return await this.journalService.getPdfPresignedUrl(id);
     } catch (error) {
       if (error instanceof HttpException) throw error;
-      throw new HttpException('PDF presigned url 생성 중 서버 오류', HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new HttpException(
+        'PDF presigned url 생성 중 서버 오류',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
+  }
+
+  @Post('upload')
+  @UseInterceptors(FileInterceptor('file'))
+  async handleUpload(@UploadedFile() file: Express.Multer.File) {
+    return await this.journalService.handleUpload(file);
   }
 }
