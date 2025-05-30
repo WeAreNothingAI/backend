@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateClientDto } from './dto/create-client.dto';
@@ -44,11 +45,21 @@ export class ClientService {
     });
   }
 
-  async fetchClient(id: number) {
+  async fetchClient(
+    id: number,
+    socialWorkerId?: number,
+    careWorkerId?: number,
+  ) {
     const client = await this.prisma.client.findUnique({ where: { id } });
-
     if (!client) {
       throw new NotFoundException('해당 노인은 존재하지 않습니다.');
+    }
+
+    if (
+      (socialWorkerId && client.socialWorkerId !== socialWorkerId) ||
+      (careWorkerId && client.careWorkerId !== careWorkerId)
+    ) {
+      throw new UnauthorizedException('권한이 없습니다.');
     }
 
     return client;
