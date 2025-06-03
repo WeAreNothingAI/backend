@@ -5,6 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
 import { GenerateJournalDocxResponseDto } from './dto/generate-journal-docx-response.dto';
 import { S3Service } from '../s3/s3.service';
+import { normalizeStringFields } from './normalize-string-fields';
 
 // Journal → python-report 요청용 매핑 유틸 함수 (클래스 정의 위에 선언)
 function mapJournalToRequest(journal: any) {
@@ -216,12 +217,16 @@ export class JournalService {
       file: data.file,
       docx_url: data.docx_url,
       pdf_url: data.pdf_url,
-      summary: data.summary,
-      recommendations: data.recommendations,
-      opinion: data.opinion,
-      result: data.result,
-      note: data.note,
-      updated,
+      summary: data.summary ?? '',
+      recommendations: data.recommendations ?? '',
+      opinion: data.opinion ?? '',
+      result: data.result ?? '',
+      note: data.note ?? '',
+      updated: normalizeStringFields({
+        ...updated,
+        createdAt: updated.createdAt?.toISOString?.() ?? '',
+        updatedAt: updated.updatedAt?.toISOString?.() ?? '',
+      }) as import('./dto/journal-updated.dto').JournalUpdatedDto,
     };
   }
 
@@ -285,5 +290,43 @@ export class JournalService {
       this.httpService.post('http://127.0.0.1:5000/generate-journal-docx/download-pdf-url', { file_name: fileName }, { timeout: 10000 })
     );
     return data;
+  }
+
+  async getJournalSummary(id: number) {
+    const journal = await this.prisma.journal.findUnique({
+      where: { id: Number(id) },
+      select: {
+        summary: true,
+        recommendations: true,
+        opinion: true,
+        result: true,
+        note: true,
+      },
+    });
+    if (!journal) throw new Error('일지를 찾을 수 없습니다.');
+    // null 방지: 빈 문자열로 변환
+    return {
+      summary: journal.summary ?? '',
+      recommendations: journal.recommendations ?? '',
+      opinion: journal.opinion ?? '',
+      result: journal.result ?? '',
+      note: journal.note ?? '',
+    };
+  }
+
+  async getJournalList() {
+    const journals = await this.prisma.journal.findMany({
+      select: {
+        id: true,
+        createdAt: true,
+        summary: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    return journals.map(j => ({
+      ...j,
+      createdAt: j.createdAt.toISOString(),
+      summary: j.summary ?? '',
+    }));
   }
 }
