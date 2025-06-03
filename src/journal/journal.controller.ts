@@ -8,6 +8,7 @@ import {
   Patch,
   Body,
   ParseIntPipe,
+  Get,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { JournalService } from './journal.service';
@@ -141,5 +142,19 @@ export class JournalController {
     @Body() { editedTranscript }: TranscriptUpdateDto,
   ) {
     return this.journalService.modifyTranscript(id, editedTranscript);
+  }
+
+  @Get(':id/raw-audio')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: '녹음된 일지 듣기',
+    description: '녹음된 일지를 듣습니다.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: '녹음된 일지 주소',
+  })
+  async getRawAudioUrl(@Param('id', ParseIntPipe) id: number) {
+    return await this.journalService.fetchRawAudio(id);
   }
 }
