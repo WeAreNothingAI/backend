@@ -49,6 +49,11 @@ export class CreateClientDto {
   @IsNotEmpty()
   socialWorkerId: number;
 
+  @ApiProperty()
+  @IsInt()
+  @IsNotEmpty()
+  careWorkerId: number;
+
   @ApiProperty({ required: false })
   @IsString()
   @IsOptional()
