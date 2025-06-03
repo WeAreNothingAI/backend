@@ -380,7 +380,7 @@ export class JournalService {
     });
     return journals.map(j => ({
       id: j.id,
-      createdAt: j.createdAt.toISOString(),
+      createdAt: j.createdAt,
     }));
   }
 }
