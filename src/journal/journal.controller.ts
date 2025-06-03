@@ -170,12 +170,4 @@ export class JournalController {
       throw new HttpException('상담일지 상세 조회 중 서버 오류', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
-
-  @Get()
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: '상담일지 목록 조회', description: '상담일지의 id, summary, 생성일자를 반환합니다.' })
-  @ApiOkResponse({ description: '상담일지 목록', type: [JournalListItemDto] })
-  async getJournalList(): Promise<JournalListItemDto[]> {
-    return this.journalService.getJournalList();
-  }
 }
