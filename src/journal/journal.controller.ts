@@ -154,6 +154,10 @@ export class JournalController {
     status: 200,
     description: '녹음된 일지 주소',
   })
+  @ApiResponse({
+    status: 404,
+    description: '해당 일지는 존재하지 않습니다.',
+  })
   async getRawAudioUrl(@Param('id', ParseIntPipe) id: number) {
     return await this.journalService.fetchRawAudio(id);
   }
