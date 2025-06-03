@@ -7,25 +7,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum Role {
-  careWorker
-  socialWorker
-}
-
-enum SocialPlatform {
-  KAKAO
-  GOOGLE
-  NAVER
-}
-
-enum WorkEventType {
-  CLOCK_IN    // 출근
-  CLOCK_OUT   // 퇴근
-  // 추후 확장 가능
-  // OUTSIDE     // 외출
-  // RETURN      // 복귀
-}
-
 model Member {
   id          Int            @id @default(autoincrement())
   email       String
@@ -50,27 +31,25 @@ model Member {
 }
 
 model ManageMember {
-  id            Int     @id                // Member.id (role: careWorker)
+  id             Int    @id
   socialWorkerId Int
-  careWorker    Member  @relation("CareWorkerToSocialWorker", fields: [id], references: [id])
-  socialWorker   Member  @relation("SocialWorkerToCareWorkers", fields: [socialWorkerId], references: [id])
+  careWorker     Member @relation("CareWorkerToSocialWorker", fields: [id], references: [id])
+  socialWorker   Member @relation("SocialWorkerToCareWorkers", fields: [socialWorkerId], references: [id])
 }
 
 model SocialAccount {
-  id            Int           @id @default(autoincrement())
-  memberId      Int
-  platform      SocialPlatform
-  platformId    String        // 플랫폼에서 제공하는 고유 ID
-  createdAt     DateTime      @default(now())
-
-  // Relations
-  member        Member        @relation(fields: [memberId], references: [id])
+  id         Int            @id @default(autoincrement())
+  memberId   Int
+  platform   SocialPlatform
+  platformId String
+  createdAt  DateTime       @default(now())
+  member     Member         @relation(fields: [memberId], references: [id])
 
   @@unique([platform, platformId])
 }
 
 model Client {
-  id              Int        @id @default(autoincrement())
+  id              Int       @id @default(autoincrement())
   name            String
   birthDate       DateTime   @db.Date
   gender          String
@@ -103,21 +82,19 @@ model Work {
 }
 
 model WorkEvent {
-  id          Int           @id @default(autoincrement())
-  workId      Int
-  type        WorkEventType
-  workTime    DateTime      @db.Time
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-
-  // Relations
-  work        Work          @relation(fields: [workId], references: [id])
+  id        Int           @id @default(autoincrement())
+  workId    Int
+  type      WorkEventType
+  time      DateTime
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  work      Work          @relation(fields: [workId], references: [id])
 
   @@index([workId])
 }
 
 model Journal {
-  id              Int       @id @default(autoincrement())
+  id              Int      @id @default(autoincrement())
   careWorkerId    Int
   clientId        Int
   rawAudioUrl     String
@@ -130,28 +107,25 @@ model Journal {
   note            String?
   exportedPdf     String?
   exportedDocx    String?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-
-  // Relations
-  careWorker      Member    @relation("CareWorkerJournals", fields: [careWorkerId], references: [id])
-  client          Client    @relation(fields:[clientId], references: [id])
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  issues          String?  @db.VarChar
+  careWorker      Member   @relation("CareWorkerJournals", fields: [careWorkerId], references: [id])
+  client          Client   @relation(fields: [clientId], references: [id])
 }
 
 model Report {
-  id            Int      @id @default(autoincrement())
+  id             Int      @id @default(autoincrement())
   socialWorkerId Int
-  periodStart   DateTime
-  periodEnd     DateTime
-  careWorkerId  Int
-  content       String
-  exported      String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  // Relations
+  periodStart    DateTime
+  periodEnd      DateTime
+  careWorkerId   Int
+  content        String
+  exported       String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  careWorker     Member   @relation("Reports_CareWorker", fields: [careWorkerId], references: [id])
   socialWorker   Member   @relation("Reports_SocialWorker", fields: [socialWorkerId], references: [id])
-  careWorker    Member   @relation("Reports_CareWorker", fields: [careWorkerId], references: [id])
 }
 
 model Notification {
@@ -161,6 +135,21 @@ model Notification {
   content   String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
   member    Member   @relation(fields: [memberId], references: [id])
+}
+
+enum Role {
+  careWorker
+  socialWorker
+}
+
+enum SocialPlatform {
+  KAKAO
+  GOOGLE
+  NAVER
+}
+
+enum WorkEventType {
+  CLOCK_IN
+  CLOCK_OUT
 }
