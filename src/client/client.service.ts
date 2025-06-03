@@ -12,7 +12,7 @@ export class ClientService {
   constructor(private prisma: PrismaService) {}
 
   async createClient(data: CreateClientDto) {
-    const { birthDate, gender, ...otherData } = data;
+    const { birthDate, gender, socialWorkerId, careWorkerId, ...otherData } = data;
 
     if (gender !== '여' && gender !== '남') {
       throw new BadRequestException('성별은 `여` 또는 `남`만 가능합니다.');
@@ -20,8 +20,18 @@ export class ClientService {
 
     const parsedDate = new Date(birthDate);
 
+    if (!careWorkerId) {
+      throw new BadRequestException('careWorkerId는 필수입니다.');
+    }
+
     return await this.prisma.client.create({
-      data: { gender, ...otherData, birthDate: parsedDate },
+      data: {
+        gender,
+        ...otherData,
+        birthDate: parsedDate,
+        socialWorkerId,
+        careWorkerId,
+      },
     });
   }
 
@@ -33,9 +43,7 @@ export class ClientService {
     }
 
     if (careWorkerId !== undefined) {
-      orConditions.push({
-        careWorkerId,
-      });
+      orConditions.push({ careWorkerId });
     }
 
     return await this.prisma.client.findMany({

@@ -10,13 +10,20 @@ import {
   ParseIntPipe,
   Get,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiOkResponse,
+} from '@nestjs/swagger';
 import { JournalService } from './journal.service';
 import {
   GenerateJournalDocxResponseDto,
   GenerateJournalPdfResponseDto,
 } from './dto/generate-journal-docx-response.dto';
 import { TranscriptUpdateDto } from './dto/update-transcript.dto';
+import { JournalSummaryResponseDto } from './dto/journal-summary-response.dto';
+import { DownloadUrlResponseDto } from './dto/download-url-response.dto';
 
 @ApiTags('journal')
 @Controller('journal')
@@ -29,7 +36,7 @@ export class JournalController {
   @ApiOperation({
     summary: '상담 일지 요약 및 문서 생성',
     description:
-      'DB에 저장된 transcript를 기반으로 python-report를 호출해 상담일지(docx)를 생성합니다.',
+      'DB에 저장된 transcript이나 editedTranscript가 있다면<br>그것을 기반으로 python-report를 호출해 상담일지(docx)를 생성합니다.',
   })
   @ApiResponse({
     status: HttpStatus.CREATED,
@@ -96,7 +103,11 @@ export class JournalController {
     summary: 'DOCX presigned url 반환',
     description: 'S3에 업로드된 docx presigned url을 반환합니다.',
   })
-  async downloadDocx(@Param('id') id: number) {
+  @ApiOkResponse({
+    description: 'DOCX presigned url 반환',
+    type: DownloadUrlResponseDto,
+  })
+  async downloadDocx(@Param('id') id: number): Promise<DownloadUrlResponseDto> {
     try {
       return await this.journalService.getDocxPresignedUrl(id);
     } catch (error) {
@@ -115,7 +126,11 @@ export class JournalController {
     summary: 'PDF presigned url 반환',
     description: 'S3에 업로드된 pdf presigned url을 반환합니다.',
   })
-  async downloadPdf(@Param('id') id: number) {
+  @ApiOkResponse({
+    description: 'PDF presigned url 반환',
+    type: DownloadUrlResponseDto,
+  })
+  async downloadPdf(@Param('id') id: number): Promise<DownloadUrlResponseDto> {
     try {
       return await this.journalService.getPdfPresignedUrl(id);
     } catch (error) {
@@ -160,5 +175,30 @@ export class JournalController {
   })
   async getRawAudioUrl(@Param('id', ParseIntPipe) id: number) {
     return await this.journalService.fetchRawAudio(id);
+  }
+
+  @Get(':id')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: '상담일지 요약 상세 조회',
+    description:
+      '상담일지의 summary, recommendations, opinion, result, note만 반환합니다.',
+  })
+  @ApiOkResponse({
+    description: '상담일지 요약 상세 조회',
+    type: JournalSummaryResponseDto,
+  })
+  async getJournalSummary(
+    @Param('id') id: number,
+  ): Promise<JournalSummaryResponseDto> {
+    try {
+      return await this.journalService.getJournalSummary(id);
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      throw new HttpException(
+        '상담일지 상세 조회 중 서버 오류',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
 }
