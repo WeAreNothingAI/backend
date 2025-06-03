@@ -351,17 +351,6 @@ export class JournalService {
     });
   }
 
-  async fetchRawAudio(id: number) {
-    const journal = await this.prisma.journal.findUnique({ where: { id } });
-    if (!journal) {
-      throw new NotFoundException('해당 일지는 존재하지 않습니다.');
-    }
-
-    return {
-      rawAudioUrl: journal.rawAudioUrl,
-    };
-  }
-
   async getJournalSummary(id: number) {
     const journal = await this.prisma.journal.findUnique({
       where: { id: Number(id) },
@@ -397,5 +386,16 @@ export class JournalService {
       id: j.id,
       createdAt: j.createdAt,
     }));
+  }
+
+  async fetchRawAudio(id: number) {
+    const journal = await this.prisma.journal.findUnique({ where: { id } });
+    if (!journal) {
+      throw new NotFoundException('해당 일지는 존재하지 않습니다.');
+    }
+
+    return {
+      rawAudioUrl: journal.rawAudioUrl,
+    };
   }
 }

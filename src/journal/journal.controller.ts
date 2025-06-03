@@ -159,24 +159,6 @@ export class JournalController {
     return this.journalService.modifyTranscript(id, editedTranscript);
   }
 
-  @Get(':id/raw-audio')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({
-    summary: '녹음된 일지 듣기',
-    description: '녹음된 일지를 듣습니다.',
-  })
-  @ApiResponse({
-    status: 200,
-    description: '녹음된 일지 주소',
-  })
-  @ApiResponse({
-    status: 404,
-    description: '해당 일지는 존재하지 않습니다.',
-  })
-  async getRawAudioUrl(@Param('id', ParseIntPipe) id: number) {
-    return await this.journalService.fetchRawAudio(id);
-  }
-
   @Get(':id')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -200,5 +182,23 @@ export class JournalController {
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
+  }
+
+  @Get(':id/raw-audio')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: '녹음된 일지 듣기',
+    description: '녹음된 일지를 듣습니다.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: '녹음된 일지 주소',
+  })
+  @ApiResponse({
+    status: 404,
+    description: '해당 일지는 존재하지 않습니다.',
+  })
+  async getRawAudioUrl(@Param('id', ParseIntPipe) id: number) {
+    return await this.journalService.fetchRawAudio(id);
   }
 }
