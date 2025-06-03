@@ -32,7 +32,7 @@ export class JournalController {
   @ApiOperation({
     summary: '상담 일지 요약 및 문서 생성',
     description:
-      'DB에 저장된 transcript를 기반으로 python-report를 호출해 상담일지(docx)를 생성합니다.',
+      'DB에 저장된 transcript이나 editedTranscript가 있다면<br>그것을 기반으로 python-report를 호출해 상담일지(docx)를 생성합니다.',
   })
   @ApiResponse({
     status: HttpStatus.CREATED,
