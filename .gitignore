@@ -58,6 +58,8 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 #생성된 보고서 파일
 report-*.docx
 journal-*.docx
+journal-*.pdf
+report-*.pdf
 
 # python 캐시 파일
 __pycache__/
