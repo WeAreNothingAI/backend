@@ -8,23 +8,26 @@ datasource db {
 }
 
 model Member {
-  id                     Int             @id @default(autoincrement())
-  email                  String
-  name                   String
-  password               String
-  role                   Role
-  createdAt              DateTime        @default(now())
-  updatedAt              DateTime        @updatedAt
-  deletedAt              DateTime?
-  clients                Client[]        @relation("CareWorkerClients")
-  journals               Journal[]       @relation("CareWorkerJournals")
-  managedBySocialWorker  ManageMember?   @relation("CareWorkerToSocialWorker")
-  managedCareWorkers     ManageMember[]  @relation("SocialWorkerToCareWorkers")
-  notifications          Notification[]
-  reportsAsCareWorker    Report[]        @relation("Reports_CareWorker")
-  reportsAsCSocialWorker Report[]        @relation("Reports_SocialWorker")
-  socialAccounts         SocialAccount[]
-  works                  Work[]
+  id          Int            @id @default(autoincrement())
+  email       String
+  name        String
+  password    String
+  role        Role
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  deletedAt   DateTime?
+
+  // Relations
+  socialAccounts    SocialAccount[]
+  managedCareWorkers ManageMember[]  @relation("SocialWorkerToCareWorkers")
+  managedBySocialWorker ManageMember[]  @relation("CareWorkerToSocialWorker")
+  works             Work[]
+  journals          Journal[]       @relation("CareWorkerJournals")
+  notifications     Notification[]
+  reportsAsCSocialWorker Report[]     @relation("Reports_SocialWorker")
+  reportsAsCareWorker  Report[]     @relation("Reports_CareWorker")
+  clients           Client[]        @relation("CareWorkerClients")
+  initialClients    Client[]        @relation("SocialWorkerClients")
 }
 
 model ManageMember {
@@ -48,29 +51,34 @@ model SocialAccount {
 model Client {
   id              Int       @id @default(autoincrement())
   name            String
-  birthDate       DateTime
+  birthDate       DateTime   @db.Date
   gender          String
+  planningTime    String
   address         String?
   contact         String?
   guardianContact String?
-  careWorkerId    Int
+  careWorkerId    Int?
+  socialWorkerId  Int
   notes           String?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  careWorker      Member    @relation("CareWorkerClients", fields: [careWorkerId], references: [id], onDelete: Cascade)
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  // Relations
+  careWorker      Member?      @relation("CareWorkerClients", fields: [careWorkerId], references: [id], onDelete: Cascade)
   journals        Journal[]
+  socialWorker    Member       @relation("SocialWorkerClients", fields: [socialWorkerId], references: [id], onDelete: Cascade)
 }
 
 model Work {
-  id        Int         @id @default(autoincrement())
-  memberId  Int
-  date      DateTime
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
-  member    Member      @relation(fields: [memberId], references: [id])
-  events    WorkEvent[]
+  id          Int       @id @default(autoincrement())
+  memberId    Int
+  workDate    DateTime  @db.Date
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
-  @@unique([memberId, date])
+  // Relations
+  member      Member    @relation(fields: [memberId], references: [id])
+  events      WorkEvent[]
 }
 
 model WorkEvent {
@@ -91,6 +99,7 @@ model Journal {
   clientId        Int
   rawAudioUrl     String
   transcript      String
+  editedTranscript String? 
   summary         String?
   recommendations String?
   opinion         String?

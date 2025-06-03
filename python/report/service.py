@@ -1,16 +1,27 @@
-from fastapi import FastAPI
+import os
+from fastapi import FastAPI, Body, HTTPException
 from pydantic import BaseModel
 from docxtpl import DocxTemplate
 from fastapi.middleware.cors import CORSMiddleware
-import openai
-import os
+from openai import OpenAI
 import uuid
-from dotenv import load_dotenv
 import json
 import time
+import subprocess
+import boto3
+import tempfile
+import platform
+
+# 개발 환경에서만 dotenv 사용
+if os.environ.get("ENV", "local") == "local":
+    from dotenv import load_dotenv
+    load_dotenv(dotenv_path=os.path.abspath(os.path.join(os.path.dirname(__file__), '../../.env')))
+
+client = OpenAI()
 
 class JournalRequest(BaseModel):
     text: str
+    editedTranscript: str = None
     date: str
     service: str
     manager: str      
@@ -25,12 +36,39 @@ class JournalRequest(BaseModel):
     result: str = ""    
     note: str = ""
 
+class PdfConvertRequest(BaseModel):
+    file_name: str
+
+class FileDownloadRequest(BaseModel):
+    file_name: str
+
+def convert_docx_to_pdf(docx_path, pdf_path):
+    if platform.system() == "Windows":
+        try:
+            from docx2pdf import convert
+            convert(docx_path, pdf_path)
+        except Exception as e:
+            raise Exception(f"docx2pdf(MS Word) PDF 변환 실패(Windows): {e}")
+    else:
+        output_dir = os.path.dirname(pdf_path)
+        try:
+            subprocess.run([
+                "libreoffice",
+                "--headless",
+                "--convert-to", "pdf",
+                "--outdir", output_dir,
+                docx_path
+            ], check=True)
+        except Exception as e:
+            raise Exception(f"LibreOffice PDF 변환 실패(Linux/Unix): {e}")
+    # libreoffice는 파일명을 자동으로 맞춰줌
+    # 변환된 파일이 output_dir에 생성됨
+
 def create_report_app() -> FastAPI:
     load_dotenv()
-    openai.api_key = os.getenv("OPENAI_API_KEY")
+    client.api_key = os.getenv("OPENAI_API_KEY")
 
     app = FastAPI()
-
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
@@ -42,7 +80,10 @@ def create_report_app() -> FastAPI:
     @app.post("/")
     def generate_journal_docx(data: JournalRequest):
         start = time.time()
+        # editedTranscript가 None/빈문자/공백일 때도 안전하게 처리
         transcript = data.text
+        if data.editedTranscript and data.editedTranscript.strip() != "":
+            transcript = data.editedTranscript
         # 1. 상담내용(요약)만 기존 프롬프트로 생성
         summary_prompt = (
             f"당신은 복지기관에서 사용하는 상담 보고서 요약을 작성하는 역할입니다.\n\n"
@@ -54,7 +95,7 @@ def create_report_app() -> FastAPI:
             f"- GPT형 멘트(예: 요약해 드리겠습니다)는 쓰지 마세요. → ❌\n"
             f"- 한 문단으로 작성하며, 항목 구분이나 줄바꿈 없이 매끄럽게 연결된 문장으로 서술하세요."
         )
-        summary_response = openai.ChatCompletion.create(
+        summary_response = client.chat.completions.create(
             model="gpt-4.1",
             messages=[
                 {"role": "system", "content": summary_prompt},
@@ -88,7 +129,7 @@ def create_report_app() -> FastAPI:
             "}\n"
             "상담 대화:\n" + transcript
         )
-        meta_response = openai.ChatCompletion.create(
+        meta_response = client.chat.completions.create(
             model="gpt-4.1",
             messages=[{"role": "system", "content": meta_prompt}]
         )
@@ -98,26 +139,131 @@ def create_report_app() -> FastAPI:
         meta_json["상담내용"] = summary
 
         # 4. 템플릿 렌더링
-        tpl = DocxTemplate("상담일지양식.docx")
-        tpl.render(meta_json)
+        try:
+            tpl = DocxTemplate("상담일지양식.docx")
+            tpl.render(meta_json)
+        except Exception as e:
+            print("[템플릿 렌더링 에러]", str(e))
+            import traceback
+            traceback.print_exc()
+            raise HTTPException(status_code=500, detail=f"템플릿 렌더링 중 오류: {str(e)}")
 
         # 5. 저장
         filename = f"journal-{uuid.uuid4()}.docx"
         filepath = f"./generated/{filename}"
         os.makedirs("generated", exist_ok=True)
-        tpl.save(filepath)
+        try:
+            tpl.save(filepath)
+        except Exception as e:
+            print("[파일 저장 에러]", str(e))
+            import traceback
+            traceback.print_exc()
+            raise HTTPException(status_code=500, detail=f"docx 파일 저장 중 오류: {str(e)}")
+
+        # 5-1. docx -> pdf 변환
+        pdf_filename = filename.replace('.docx', '.pdf')
+        pdf_filepath = filepath.replace('.docx', '.pdf')
+        try:
+            convert_docx_to_pdf(filepath, pdf_filepath)
+        except Exception as e:
+            import traceback
+            print(f"[PDF 변환 오류] {e}")
+            traceback.print_exc()
+            raise HTTPException(status_code=500, detail=f"PDF 변환 중 오류: {str(e)}")
+
+        BUCKET_NAME = 'oncare-backend'
+        s3 = boto3.client('s3')
+        docx_s3_key = f"journal/docx/{filename}"
+        pdf_s3_key = f"journal/pdf/{pdf_filename}"
+        try:
+            s3.upload_file(filepath, BUCKET_NAME, docx_s3_key)
+        except Exception as e:
+            print("[S3 업로드 중 에러 - DOCX]", str(e))
+            import traceback
+            traceback.print_exc()
+            raise HTTPException(status_code=500, detail=f"S3 DOCX 업로드 중 오류: {str(e)}")
+        try:
+            s3.upload_file(pdf_filepath, BUCKET_NAME, pdf_s3_key)
+        except Exception as e:
+            print("[S3 업로드 중 에러 - PDF]", str(e))
+            import traceback
+            traceback.print_exc()
+            raise HTTPException(status_code=500, detail=f"S3 PDF 업로드 중 오류: {str(e)}")
+        docx_url = f"https://{BUCKET_NAME}.s3.amazonaws.com/{docx_s3_key}"
+        pdf_url = f"https://{BUCKET_NAME}.s3.amazonaws.com/{pdf_s3_key}"
+
+        # 5-3. (선택) 로컬 파일 삭제
+        os.remove(filepath)
+        os.remove(pdf_filepath)
 
         # 6. 응답
         end = time.time()
         print(f"문서 생성 처리 시간: {end - start:.2f}초")
         return {
             "file": filename,
-            "path": filepath,
+            "docx_url": docx_url,
+            "pdf_url": pdf_url,
             "summary": summary,
             "recommendations": meta_json["조치사항"],
             "opinion": meta_json["상담자의견"],
             "result": meta_json["상담결과"],
             "note": meta_json["비고"]
         }
+
+    @app.post("/convert-journal-pdf")
+    def convert_journal_pdf(req: PdfConvertRequest):
+        file_name = req.file_name
+        BUCKET_NAME = 'oncare-backend'
+        s3 = boto3.client('s3')
+        docx_s3_key = f"journal/docx/{file_name}"
+        pdf_file_name = file_name.replace('.docx', '.pdf')
+        pdf_s3_key = f"journal/pdf/{pdf_file_name}"
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                docx_path = os.path.join(tmpdir, file_name)
+                pdf_path = os.path.join(tmpdir, pdf_file_name)
+                # 1. S3에서 docx 다운로드
+                s3.download_file(BUCKET_NAME, docx_s3_key, docx_path)
+                # 2. 변환 (OS별 분기)
+                try:
+                    convert_docx_to_pdf(docx_path, pdf_path)
+                except Exception as e:
+                    import traceback
+                    print(f"[PDF 변환 오류] {e}")
+                    traceback.print_exc()
+                    raise HTTPException(status_code=500, detail=f"PDF 변환 중 오류: {str(e)}")
+                # 3. S3 업로드
+                s3.upload_file(pdf_path, BUCKET_NAME, pdf_s3_key)
+                pdf_url = f"https://{BUCKET_NAME}.s3.amazonaws.com/{pdf_s3_key}"
+            return {"pdf_url": pdf_url}
+        except Exception as e:
+            import traceback
+            print(f"[PDF 변환/업로드 오류] {e}")
+            traceback.print_exc()
+            raise HTTPException(status_code=500, detail=f"PDF 변환/업로드 중 오류: {str(e)}")
+
+    @app.post("/download-docx-url")
+    def get_docx_download_url(req: FileDownloadRequest):
+        BUCKET_NAME = 'oncare-backend'
+        s3 = boto3.client('s3')
+        docx_s3_key = f"journal/docx/{req.file_name}"
+        url = s3.generate_presigned_url(
+            ClientMethod='get_object',
+            Params={'Bucket': BUCKET_NAME, 'Key': docx_s3_key},
+            ExpiresIn=60 * 10  # 10분
+        )
+        return {"download_url": url}
+
+    @app.post("/download-pdf-url")
+    def get_pdf_download_url(req: FileDownloadRequest):
+        BUCKET_NAME = 'oncare-backend'
+        s3 = boto3.client('s3')
+        pdf_s3_key = f"journal/pdf/{req.file_name}"
+        url = s3.generate_presigned_url(
+            ClientMethod='get_object',
+            Params={'Bucket': BUCKET_NAME, 'Key': pdf_s3_key},
+            ExpiresIn=60 * 10  # 10분
+        )
+        return {"download_url": url}
 
     return app 
