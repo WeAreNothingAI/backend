@@ -369,19 +369,18 @@ export class JournalService {
     };
   }
 
-  async getJournalList() {
+  async getJournalListByClient(clientId: number) {
     const journals = await this.prisma.journal.findMany({
+      where: { clientId },
       select: {
         id: true,
         createdAt: true,
-        summary: true,
       },
       orderBy: { createdAt: 'desc' },
     });
     return journals.map(j => ({
-      ...j,
+      id: j.id,
       createdAt: j.createdAt.toISOString(),
-      summary: j.summary ?? '',
     }));
   }
 }
