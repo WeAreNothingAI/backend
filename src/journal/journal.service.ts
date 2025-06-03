@@ -1,4 +1,9 @@
-import { Injectable, Logger, InternalServerErrorException, HttpException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  InternalServerErrorException,
+  HttpException,
+} from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import { PrismaService } from '../prisma/prisma.service';
@@ -40,9 +45,14 @@ export class JournalService {
     private readonly configService: ConfigService,
     private readonly s3Service: S3Service,
   ) {
-    this.sttServerUrl = this.configService.get<string>('STT_SERVER_URL', 'http://localhost:5000/transcribe');
+    this.sttServerUrl = this.configService.get<string>(
+      'STT_SERVER_URL',
+      'http://localhost:5000/transcribe',
+    );
     this.sttTimeout = this.configService.get<number>('STT_TIMEOUT', 60000);
-    this.logger.log(`Initialized with STT_SERVER_URL: ${this.sttServerUrl}, STT_TIMEOUT: ${this.sttTimeout}`);
+    this.logger.log(
+      `Initialized with STT_SERVER_URL: ${this.sttServerUrl}, STT_TIMEOUT: ${this.sttTimeout}`,
+    );
   }
 
   async uploadAudioFile(file: Express.Multer.File): Promise<string> {
@@ -52,7 +62,9 @@ export class JournalService {
       return url;
     } catch (error) {
       this.logger.error('Error uploading audio file to S3:', error);
-      throw new InternalServerErrorException('오디오 파일 업로드 중 오류가 발생했습니다.');
+      throw new InternalServerErrorException(
+        '오디오 파일 업로드 중 오류가 발생했습니다.',
+      );
     }
   }
 
@@ -62,20 +74,16 @@ export class JournalService {
     for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
       try {
         this.logger.debug(`STT attempt ${attempt}/${this.maxRetries}`);
-        
+
         const response = await firstValueFrom(
-          this.httpService.post(
-            this.sttServerUrl,
-            audioBuffer,
-            {
-              headers: {
-                'Content-Type': 'audio/webm',
-              },
-              timeout: 60000,
-              maxContentLength: Infinity,
-              maxBodyLength: Infinity,
+          this.httpService.post(this.sttServerUrl, audioBuffer, {
+            headers: {
+              'Content-Type': 'audio/webm',
             },
-          ),
+            timeout: 60000,
+            maxContentLength: Infinity,
+            maxBodyLength: Infinity,
+          }),
         );
 
         if (!response.data || !response.data.text) {
@@ -91,7 +99,7 @@ export class JournalService {
         );
 
         if (attempt < this.maxRetries) {
-          await new Promise(resolve => setTimeout(resolve, this.retryDelay));
+          await new Promise((resolve) => setTimeout(resolve, this.retryDelay));
           this.logger.log(`Retrying STT... (${attempt}/${this.maxRetries})`);
         }
       }
@@ -116,7 +124,7 @@ export class JournalService {
       path: '',
       stream: null as any,
     };
-    
+
     return await this.s3Service.uploadAudio(file, filename);
   }
 
@@ -135,8 +143,11 @@ export class JournalService {
   }) {
     try {
       const filename = `audio_${data.clientId}_${Date.now()}.webm`;
-      const rawAudioUrl = await this.uploadAudioBuffer(data.audioBuffer, filename);
-      
+      const rawAudioUrl = await this.uploadAudioBuffer(
+        data.audioBuffer,
+        filename,
+      );
+
       this.logger.debug('Creating journal entry with audio URL:', rawAudioUrl);
 
       const result = await this.prisma.journal.create({
@@ -167,7 +178,9 @@ export class JournalService {
     }
   }
 
-  async generateJournalDocx(journalData: any): Promise<GenerateJournalDocxResponseDto> {
+  async generateJournalDocx(
+    journalData: any,
+  ): Promise<GenerateJournalDocxResponseDto> {
     try {
       const response = await firstValueFrom(
         this.httpService.post(
@@ -177,12 +190,15 @@ export class JournalService {
             headers: { 'Content-Type': 'application/json' },
             timeout: 60000,
           },
-        )
+        ),
       );
       return response.data as GenerateJournalDocxResponseDto; // { file, path } 등 반환
     } catch (error) {
       this.logger.error('python-report 호출 중 오류:', error);
-      throw new InternalServerErrorException('문서 생성 중 오류가 발생했습니다.', error.message);
+      throw new InternalServerErrorException(
+        '문서 생성 중 오류가 발생했습니다.',
+        error.message,
+      );
     }
   }
 
@@ -196,7 +212,11 @@ export class JournalService {
     const requestBody = mapJournalToRequest(journal);
 
     const { data } = await firstValueFrom(
-      this.httpService.post('http://127.0.0.1:5000/generate-journal-docx', requestBody, { timeout: 60000 })
+      this.httpService.post(
+        'http://127.0.0.1:5000/generate-journal-docx',
+        requestBody,
+        { timeout: 60000 },
+      ),
     );
 
     const updated = await this.prisma.journal.update({
@@ -231,15 +251,21 @@ export class JournalService {
       const journal = await this.prisma.journal.findUnique({
         where: { id: Number(id) },
       });
-      if (!journal || !journal.exportedDocx) throw new Error('docx 파일이 존재하지 않습니다.');
+      if (!journal || !journal.exportedDocx)
+        throw new Error('docx 파일이 존재하지 않습니다.');
 
       // 2. docx 파일명 추출 (S3 URL 또는 Key에서 파일명만 추출)
       let fileName = journal.exportedDocx as string;
-      if (fileName.includes('/')) fileName = fileName.split('/').pop() as string;
+      if (fileName.includes('/'))
+        fileName = fileName.split('/').pop() as string;
 
       // 3. Python 서버에 PDF 변환 요청
       const { data } = await firstValueFrom(
-        this.httpService.post('http://127.0.0.1:5000/generate-journal-docx/convert-journal-pdf', { file_name: fileName }, { timeout: 60000 })
+        this.httpService.post(
+          'http://127.0.0.1:5000/generate-journal-docx/convert-journal-pdf',
+          { file_name: fileName },
+          { timeout: 60000 },
+        ),
       );
 
       // 4. DB에 pdf_url 저장
@@ -251,39 +277,68 @@ export class JournalService {
       // 5. pdf_url 반환
       return { pdf_url: data.pdf_url };
     } catch (error) {
-      const msg = error?.response?.data?.detail || error.message || 'PDF 변환 중 오류가 발생했습니다.';
+      const msg =
+        error?.response?.data?.detail ||
+        error.message ||
+        'PDF 변환 중 오류가 발생했습니다.';
       const status = error?.status || error?.response?.status || 500;
       // OS별 안내 메시지 추가
       let osHint = '';
-      if (msg.includes('docx2pdf')) osHint = ' (윈도우 환경: Microsoft Word 및 docx2pdf 패키지가 필요합니다)';
-      if (msg.includes('LibreOffice')) osHint = ' (리눅스 환경: LibreOffice가 설치되어 있어야 합니다)';
+      if (msg.includes('docx2pdf'))
+        osHint =
+          ' (윈도우 환경: Microsoft Word 및 docx2pdf 패키지가 필요합니다)';
+      if (msg.includes('LibreOffice'))
+        osHint = ' (리눅스 환경: LibreOffice가 설치되어 있어야 합니다)';
       throw new HttpException(msg + osHint, status);
     }
   }
 
   async getDocxPresignedUrl(id: number) {
     // 1. DB에서 docx 파일명(S3 Key) 조회
-    const journal = await this.prisma.journal.findUnique({ where: { id: Number(id) } });
-    if (!journal || !journal.exportedDocx) throw new Error('docx 파일이 존재하지 않습니다.');
+    const journal = await this.prisma.journal.findUnique({
+      where: { id: Number(id) },
+    });
+    if (!journal || !journal.exportedDocx)
+      throw new Error('docx 파일이 존재하지 않습니다.');
     let fileName = journal.exportedDocx as string;
     if (fileName.includes('/')) fileName = fileName.split('/').pop() as string;
     // 2. Python 서버 presigned url API 호출
     const { data } = await firstValueFrom(
-      this.httpService.post('http://127.0.0.1:5000/generate-journal-docx/download-docx-url', { file_name: fileName }, { timeout: 10000 })
+      this.httpService.post(
+        'http://127.0.0.1:5000/generate-journal-docx/download-docx-url',
+        { file_name: fileName },
+        { timeout: 10000 },
+      ),
     );
     return data;
   }
 
   async getPdfPresignedUrl(id: number) {
     // 1. DB에서 pdf 파일명(S3 Key) 조회
-    const journal = await this.prisma.journal.findUnique({ where: { id: Number(id) } });
-    if (!journal || !journal.exportedPdf) throw new Error('pdf 파일이 존재하지 않습니다.');
+    const journal = await this.prisma.journal.findUnique({
+      where: { id: Number(id) },
+    });
+    if (!journal || !journal.exportedPdf)
+      throw new Error('pdf 파일이 존재하지 않습니다.');
     let fileName = journal.exportedPdf as string;
     if (fileName.includes('/')) fileName = fileName.split('/').pop() as string;
     // 2. Python 서버 presigned url API 호출
     const { data } = await firstValueFrom(
-      this.httpService.post('http://127.0.0.1:5000/generate-journal-docx/download-pdf-url', { file_name: fileName }, { timeout: 10000 })
+      this.httpService.post(
+        'http://127.0.0.1:5000/generate-journal-docx/download-pdf-url',
+        { file_name: fileName },
+        { timeout: 10000 },
+      ),
     );
     return data;
+  }
+
+  async modifyTranscript(id: number, editedTranscript: string) {
+    return this.prisma.journal.update({
+      where: { id },
+      data: {
+        editedTranscript,
+      },
+    });
   }
 }
