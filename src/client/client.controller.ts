@@ -11,12 +11,17 @@ import {
 } from '@nestjs/common';
 import { ClientService } from './client.service';
 import { CreateClientDto } from './dto/create-client.dto';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiResponse, ApiTags, ApiOkResponse } from '@nestjs/swagger';
+import { JournalService } from '../journal/journal.service';
+import { JournalListItemDto } from '../journal/dto/journal-list-item.dto';
 
 @ApiTags('client')
 @Controller('client')
 export class ClientController {
-  constructor(private clientService: ClientService) {}
+  constructor(
+    private readonly clientService: ClientService,
+    private readonly journalService: JournalService,
+  ) {}
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
@@ -66,5 +71,19 @@ export class ClientController {
   })
   async getClient(@Param('id', ParseIntPipe) id: number) {
     return await this.clientService.fetchClient(id);
+  }
+
+  @Get(':clientId/journal')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ 
+    summary: '특정 노인별 상담일지 목록 조회',
+    description: '특정 노인(client)의 일지 id, 생성일자만 반환' 
+  })
+  @ApiOkResponse({ 
+    description: '상담일지 목록', 
+    type: [JournalListItemDto] 
+  })
+  async getJournalListByClient(@Param('clientId', ParseIntPipe) clientId: number): Promise<JournalListItemDto[]> {
+    return this.journalService.getJournalListByClient(clientId);
   }
 }
