@@ -122,6 +122,7 @@ model Journal {
   clientId        Int
   rawAudioUrl     String
   transcript      String
+  editedTranscript String? 
   summary         String?
   recommendations String?
   opinion         String?
