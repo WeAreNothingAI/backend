@@ -15,7 +15,7 @@ import { normalizeStringFields } from './normalize-string-fields';
 // Journal → python-report 요청용 매핑 유틸 함수 (클래스 정의 위에 선언)
 function mapJournalToRequest(journal: any) {
   return {
-    text: journal.transcript,
+    text: journal.editedTranscript && journal.editedTranscript.trim() !== '' ? journal.editedTranscript : journal.transcript,
     date: journal.createdAt.toISOString().slice(0, 10),
     service: '',
     manager: journal.careWorker?.name ?? '',

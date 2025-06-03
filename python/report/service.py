@@ -3,7 +3,7 @@ from fastapi import FastAPI, Body, HTTPException
 from pydantic import BaseModel
 from docxtpl import DocxTemplate
 from fastapi.middleware.cors import CORSMiddleware
-import openai
+from openai import OpenAI
 import uuid
 import json
 import time
@@ -17,8 +17,11 @@ if os.environ.get("ENV", "local") == "local":
     from dotenv import load_dotenv
     load_dotenv(dotenv_path=os.path.abspath(os.path.join(os.path.dirname(__file__), '../../.env')))
 
+client = OpenAI()
+
 class JournalRequest(BaseModel):
     text: str
+    editedTranscript: str = None
     date: str
     service: str
     manager: str      
@@ -62,7 +65,9 @@ def convert_docx_to_pdf(docx_path, pdf_path):
     # 변환된 파일이 output_dir에 생성됨
 
 def create_report_app() -> FastAPI:
-    openai.api_key = os.getenv("OPENAI_API_KEY")
+    load_dotenv()
+    client.api_key = os.getenv("OPENAI_API_KEY")
+
     app = FastAPI()
     app.add_middleware(
         CORSMiddleware,
@@ -75,7 +80,10 @@ def create_report_app() -> FastAPI:
     @app.post("/")
     def generate_journal_docx(data: JournalRequest):
         start = time.time()
+        # editedTranscript가 None/빈문자/공백일 때도 안전하게 처리
         transcript = data.text
+        if data.editedTranscript and data.editedTranscript.strip() != "":
+            transcript = data.editedTranscript
         # 1. 상담내용(요약)만 기존 프롬프트로 생성
         summary_prompt = (
             f"당신은 복지기관에서 사용하는 상담 보고서 요약을 작성하는 역할입니다.\n\n"
@@ -87,7 +95,7 @@ def create_report_app() -> FastAPI:
             f"- GPT형 멘트(예: 요약해 드리겠습니다)는 쓰지 마세요. → ❌\n"
             f"- 한 문단으로 작성하며, 항목 구분이나 줄바꿈 없이 매끄럽게 연결된 문장으로 서술하세요."
         )
-        summary_response = openai.ChatCompletion.create(
+        summary_response = client.chat.completions.create(
             model="gpt-4.1",
             messages=[
                 {"role": "system", "content": summary_prompt},
@@ -121,7 +129,7 @@ def create_report_app() -> FastAPI:
             "}\n"
             "상담 대화:\n" + transcript
         )
-        meta_response = openai.ChatCompletion.create(
+        meta_response = client.chat.completions.create(
             model="gpt-4.1",
             messages=[{"role": "system", "content": meta_prompt}]
         )
