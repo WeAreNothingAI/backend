@@ -4,7 +4,6 @@ from pydantic import BaseModel
 from docxtpl import DocxTemplate
 from fastapi.middleware.cors import CORSMiddleware
 from openai import OpenAI
-import os
 import uuid
 import json
 import time
@@ -20,8 +19,11 @@ if os.environ.get("ENV", "local") == "local":
      
 client = OpenAI()
 
+client = OpenAI()
+
 class JournalRequest(BaseModel):
     text: str
+    editedTranscript: str = None
     date: str
     service: str
     manager: str      
@@ -80,7 +82,10 @@ def create_report_app() -> FastAPI:
     @app.post("/")
     def generate_journal_docx(data: JournalRequest):
         start = time.time()
+        # editedTranscript가 None/빈문자/공백일 때도 안전하게 처리
         transcript = data.text
+        if data.editedTranscript and data.editedTranscript.strip() != "":
+            transcript = data.editedTranscript
         # 1. 상담내용(요약)만 기존 프롬프트로 생성
         summary_prompt = (
             f"당신은 복지기관에서 사용하는 상담 보고서 요약을 작성하는 역할입니다.\n\n"
