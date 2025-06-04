@@ -35,7 +35,13 @@ export class ClientService {
     });
   }
 
-  async fetchManyClient(socialWorkerId?: number, careWorkerId?: number) {
+  async fetchManyClient({
+    socialWorkerId,
+    careWorkerId,
+  }: {
+    socialWorkerId?: number;
+    careWorkerId?: number;
+  }) {
     const orConditions: any[] = [];
 
     if (socialWorkerId !== undefined) {
@@ -53,11 +59,15 @@ export class ClientService {
     });
   }
 
-  async fetchClient(
-    id: number,
-    socialWorkerId?: number,
-    careWorkerId?: number,
-  ) {
+  async fetchClient({
+    id,
+    socialWorkerId,
+    careWorkerId,
+  }: {
+    id: number;
+    socialWorkerId?: number;
+    careWorkerId?: number;
+  }) {
     const client = await this.prisma.client.findUnique({ where: { id } });
     if (!client) {
       throw new NotFoundException('해당 노인은 존재하지 않습니다.');

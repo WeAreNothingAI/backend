@@ -58,11 +58,14 @@ export class JournalController {
     description: '서버 오류',
   })
   async summarizeJournal(
-    @Param('id') id: number,
+    @Param('id', ParseIntPipe) id: number,
     @CurrentUser() user,
   ): Promise<GenerateJournalDocxResponseDto> {
     try {
-      const result = await this.journalService.summarizeJournal(id, user.id);
+      const result = await this.journalService.summarizeJournal({
+        id,
+        careWorkerId: user.id,
+      });
       return result;
     } catch (error) {
       if (error instanceof HttpException) throw error;
@@ -90,7 +93,7 @@ export class JournalController {
     description: '서버 오류',
   })
   async convertJournalPdf(
-    @Param('id') id: number,
+    @Param('id', ParseIntPipe) id: number,
     @CurrentUser() user,
   ): Promise<GenerateJournalPdfResponseDto> {
     try {
@@ -115,7 +118,9 @@ export class JournalController {
     description: 'DOCX presigned url 반환',
     type: DownloadUrlResponseDto,
   })
-  async downloadDocx(@Param('id') id: number): Promise<DownloadUrlResponseDto> {
+  async downloadDocx(
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<DownloadUrlResponseDto> {
     try {
       return await this.journalService.getDocxPresignedUrl(id);
     } catch (error) {
@@ -138,7 +143,9 @@ export class JournalController {
     description: 'PDF presigned url 반환',
     type: DownloadUrlResponseDto,
   })
-  async downloadPdf(@Param('id') id: number): Promise<DownloadUrlResponseDto> {
+  async downloadPdf(
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<DownloadUrlResponseDto> {
     try {
       return await this.journalService.getPdfPresignedUrl(id);
     } catch (error) {
@@ -184,19 +191,19 @@ export class JournalController {
     type: JournalSummaryResponseDto,
   })
   async getJournalSummary(
-    @Param('id') id: number,
+    @Param('id', ParseIntPipe) id: number,
     @CurrentUser() user,
   ): Promise<JournalSummaryResponseDto> {
     // 역할에 따라 적절한 ID를 넘김
-    const socialWorkerId = user.role === 'SOCIAL_WORKER' ? user.id : undefined;
-    const careWorkerId = user.role === 'CARE_WORKER' ? user.id : undefined;
+    const socialWorkerId = user.role === 'socialWorker' ? user.id : undefined;
+    const careWorkerId = user.role === 'careWorker' ? user.id : undefined;
 
     try {
-      return await this.journalService.getJournalSummary(
+      return await this.journalService.getJournalSummary({
         id,
         socialWorkerId,
         careWorkerId,
-      );
+      });
     } catch (error) {
       if (error instanceof HttpException) throw error;
       throw new HttpException(

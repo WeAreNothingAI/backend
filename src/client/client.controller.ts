@@ -52,7 +52,7 @@ export class ClientController {
     @Body() data: CreateClientDto,
     @CurrentUser() user: { id: number; role: string },
   ) {
-    if (user.role !== 'SOCIAL_WORKER') {
+    if (user.role !== 'socialWorker') {
       throw new ForbiddenException('복지사만 이용할 수 있습니다.');
     }
 
@@ -70,7 +70,13 @@ export class ClientController {
     description: '노인 정보 목록 가져오기 성공',
   })
   async getManyClient(@CurrentUser() user) {
-    return await this.clientService.fetchManyClient(user.id);
+    const socialWorkerId = user.role === 'socialWorker' ? user.id : undefined;
+    const careWorkerId = user.role === 'careWorker' ? user.id : undefined;
+
+    return await this.clientService.fetchManyClient({
+      socialWorkerId,
+      careWorkerId,
+    });
   }
 
   @Get(':id')
@@ -89,10 +95,11 @@ export class ClientController {
   })
   async getClient(@Param('id', ParseIntPipe) id: number, @CurrentUser() user) {
     // 역할에 따라 적절한 ID를 넘김
-    const socialWorkerId = user.role === 'SOCIAL_WORKER' ? user.id : undefined;
-    const careWorkerId = user.role === 'CARE_WORKER' ? user.id : undefined;
 
-    return this.clientService.fetchClient(id, socialWorkerId, careWorkerId);
+    const socialWorkerId = user.role === 'socialWorker' ? user.id : undefined;
+    const careWorkerId = user.role === 'careWorker' ? user.id : undefined;
+
+    return this.clientService.fetchClient({ id, socialWorkerId, careWorkerId });
   }
 
   @Get(':clientId/journal')
@@ -110,13 +117,13 @@ export class ClientController {
     @CurrentUser() user,
   ): Promise<JournalListItemDto[]> {
     // 역할에 따라 적절한 ID를 넘김
-    const socialWorkerId = user.role === 'SOCIAL_WORKER' ? user.id : undefined;
-    const careWorkerId = user.role === 'CARE_WORKER' ? user.id : undefined;
+    const socialWorkerId = user.role === 'socialWorker' ? user.id : undefined;
+    const careWorkerId = user.role === 'careWorker' ? user.id : undefined;
 
-    return this.journalService.getJournalListByClient(
+    return this.journalService.getJournalListByClient({
       clientId,
       socialWorkerId,
       careWorkerId,
-    );
+    });
   }
 }

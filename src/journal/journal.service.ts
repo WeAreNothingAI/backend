@@ -211,8 +211,14 @@ export class JournalService {
     }
   }
 
-  async summarizeJournal(id: number, careWorkerId: number) {
-    const journal = await this.findJournal(id);
+  async summarizeJournal({
+    id,
+    careWorkerId,
+  }: {
+    id: number;
+    careWorkerId: number;
+  }) {
+    const journal = await this.findJournal({ id });
     if (journal.careWorkerId !== careWorkerId) {
       throw new UnauthorizedException('본인만 생성할 수 있습니다.');
     }
@@ -356,7 +362,7 @@ export class JournalService {
     careWorkerId: number;
   }) {
     // 1. 일지 조회
-    const journal = await this.findJournal(id);
+    const journal = await this.findJournal({ id });
 
     // 2. 본인인지 확인
     if (journal.careWorkerId !== careWorkerId) {
@@ -373,7 +379,7 @@ export class JournalService {
   }
 
   // 일지 한 개 가져오기
-  async findJournal(id: number) {
+  async findJournal({ id }: { id: number }) {
     const journal = await this.prisma.journal.findUnique({
       where: { id },
       include: { client: true, careWorker: true },
@@ -386,11 +392,15 @@ export class JournalService {
   }
 
   // 일지 상세 보기
-  async getJournalSummary(
-    id: number,
-    careWorkerId?: number,
-    socialWorkerId?: number,
-  ) {
+  async getJournalSummary({
+    id,
+    careWorkerId,
+    socialWorkerId,
+  }: {
+    id: number;
+    careWorkerId?: number;
+    socialWorkerId?: number;
+  }) {
     // const journal = await this.prisma.journal.findUnique({
     //   where: { id: Number(id) },
     //   select: {
@@ -404,7 +414,7 @@ export class JournalService {
     // if (!journal) throw new Error('일지를 찾을 수 없습니다.');
     // // null 방지: 빈 문자열로 변환
 
-    const journal = await this.findJournal(id);
+    const journal = await this.findJournal({ id });
 
     if (
       (socialWorkerId && journal.client.socialWorkerId !== socialWorkerId) ||
@@ -423,16 +433,20 @@ export class JournalService {
   }
 
   // client 별 일지 목록
-  async getJournalListByClient(
-    clientId: number,
-    careWorkerId?: number,
-    socialWorkerId?: number,
-  ) {
-    await this.clientService.fetchClient(
-      clientId,
+  async getJournalListByClient({
+    clientId,
+    careWorkerId,
+    socialWorkerId,
+  }: {
+    clientId: number;
+    careWorkerId?: number;
+    socialWorkerId?: number;
+  }) {
+    await this.clientService.fetchClient({
+      id: clientId,
       socialWorkerId,
       careWorkerId,
-    );
+    });
 
     const journals = await this.prisma.journal.findMany({
       where: { clientId },
