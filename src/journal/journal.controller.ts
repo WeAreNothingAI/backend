@@ -1,26 +1,36 @@
-import { 
-  Controller, 
-  Post, 
-  Param, 
-  HttpCode, 
-  HttpException, 
+import {
+  Controller,
+  Post,
+  Param,
+  HttpCode,
+  HttpException,
   HttpStatus,
   Patch,
   Body,
   ParseIntPipe,
-  Get
- } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiOkResponse } from '@nestjs/swagger';
+  Get,
+  UseGuards,
+} from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiOkResponse,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { JournalService } from './journal.service';
-import { 
-  GenerateJournalDocxResponseDto, 
-  GenerateJournalPdfResponseDto 
+import {
+  GenerateJournalDocxResponseDto,
+  GenerateJournalPdfResponseDto,
 } from './dto/generate-journal-docx-response.dto';
 import { TranscriptUpdateDto } from './dto/update-transcript.dto';
 import { JournalSummaryResponseDto } from './dto/journal-summary-response.dto';
 import { DownloadUrlResponseDto } from './dto/download-url-response.dto';
-import { JournalListItemDto } from './dto/journal-list-item.dto';
+import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
+import { CurrentUser } from 'src/auth/decorators/current-user.decorator';
 
+@UseGuards(JwtAuthGuard)
+@ApiBearerAuth('JWT')
 @ApiTags('journal')
 @Controller('journal')
 export class JournalController {
@@ -49,9 +59,10 @@ export class JournalController {
   })
   async summarizeJournal(
     @Param('id') id: number,
+    @CurrentUser() user,
   ): Promise<GenerateJournalDocxResponseDto> {
     try {
-      const result = await this.journalService.summarizeJournal(id);
+      const result = await this.journalService.summarizeJournal(id, user.id);
       return result;
     } catch (error) {
       if (error instanceof HttpException) throw error;
@@ -80,6 +91,7 @@ export class JournalController {
   })
   async convertJournalPdf(
     @Param('id') id: number,
+    @CurrentUser() user,
   ): Promise<GenerateJournalPdfResponseDto> {
     try {
       return await this.journalService.convertJournalPdf(id);
@@ -95,13 +107,13 @@ export class JournalController {
   // DOCX presigned url 반환
   @Post(':id/download-docx')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ 
-    summary: 'DOCX presigned url 반환', 
-    description: 'S3에 업로드된 docx presigned url을 반환합니다.' 
+  @ApiOperation({
+    summary: 'DOCX presigned url 반환',
+    description: 'S3에 업로드된 docx presigned url을 반환합니다.',
   })
-  @ApiOkResponse({ 
-    description: 'DOCX presigned url 반환', 
-    type: DownloadUrlResponseDto 
+  @ApiOkResponse({
+    description: 'DOCX presigned url 반환',
+    type: DownloadUrlResponseDto,
   })
   async downloadDocx(@Param('id') id: number): Promise<DownloadUrlResponseDto> {
     try {
@@ -118,13 +130,13 @@ export class JournalController {
   // PDF presigned url 반환
   @Post(':id/download-pdf')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ 
-    summary: 'PDF presigned url 반환', 
-    description: 'S3에 업로드된 pdf presigned url을 반환합니다.' 
+  @ApiOperation({
+    summary: 'PDF presigned url 반환',
+    description: 'S3에 업로드된 pdf presigned url을 반환합니다.',
   })
-  @ApiOkResponse({ 
-    description: 'PDF presigned url 반환', 
-    type: DownloadUrlResponseDto 
+  @ApiOkResponse({
+    description: 'PDF presigned url 반환',
+    type: DownloadUrlResponseDto,
   })
   async downloadPdf(@Param('id') id: number): Promise<DownloadUrlResponseDto> {
     try {
@@ -151,23 +163,46 @@ export class JournalController {
   async updateTranscript(
     @Param('id', ParseIntPipe) id: number,
     @Body() { editedTranscript }: TranscriptUpdateDto,
+    @CurrentUser() user,
   ) {
-    return this.journalService.modifyTranscript(id, editedTranscript);
+    return this.journalService.modifyTranscript({
+      id,
+      editedTranscript,
+      careWorkerId: user.id,
+    });
   }
 
   @Get(':id')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: '상담일지 요약 상세 조회', description: '상담일지의 summary, recommendations, opinion, result, note만 반환합니다.' })
+  @ApiOperation({
+    summary: '상담일지 요약 상세 조회',
+    description:
+      '상담일지의 summary, recommendations, opinion, result, note만 반환합니다.',
+  })
   @ApiOkResponse({
     description: '상담일지 요약 상세 조회',
     type: JournalSummaryResponseDto,
   })
-  async getJournalSummary(@Param('id') id: number): Promise<JournalSummaryResponseDto> {
+  async getJournalSummary(
+    @Param('id') id: number,
+    @CurrentUser() user,
+  ): Promise<JournalSummaryResponseDto> {
+    // 역할에 따라 적절한 ID를 넘김
+    const socialWorkerId = user.role === 'SOCIAL_WORKER' ? user.id : undefined;
+    const careWorkerId = user.role === 'CARE_WORKER' ? user.id : undefined;
+
     try {
-      return await this.journalService.getJournalSummary(id);
+      return await this.journalService.getJournalSummary(
+        id,
+        socialWorkerId,
+        careWorkerId,
+      );
     } catch (error) {
       if (error instanceof HttpException) throw error;
-      throw new HttpException('상담일지 상세 조회 중 서버 오류', HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new HttpException(
+        '상담일지 상세 조회 중 서버 오류',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 }

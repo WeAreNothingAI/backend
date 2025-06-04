@@ -11,8 +11,8 @@ import { CreateClientDto } from './dto/create-client.dto';
 export class ClientService {
   constructor(private prisma: PrismaService) {}
 
-  async createClient(data: CreateClientDto) {
-    const { birthDate, gender, socialWorkerId, careWorkerId, ...otherData } = data;
+  async createClient(data: CreateClientDto, socialWorkerId: number) {
+    const { birthDate, gender, careWorkerId, ...otherData } = data;
 
     if (gender !== '여' && gender !== '남') {
       throw new BadRequestException('성별은 `여` 또는 `남`만 가능합니다.');

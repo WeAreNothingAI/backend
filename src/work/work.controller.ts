@@ -1,19 +1,23 @@
-import { Controller, Param, ParseIntPipe, Post } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { Controller, Post, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { WorkService } from './work.service';
+import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
+import { CurrentUser } from 'src/auth/decorators/current-user.decorator';
 
+@UseGuards(JwtAuthGuard)
+@ApiBearerAuth('JWT')
 @ApiTags('work')
 @Controller('work')
 export class WorkController {
   constructor(private workService: WorkService) {}
 
-  @Post('start/:id')
-  async postWorkIn(@Param('id', ParseIntPipe) memberId: number) {
-    return await this.workService.createWorkIn(memberId);
+  @Post('start')
+  async postWorkIn(@CurrentUser() user) {
+    return await this.workService.createWorkIn(user.id);
   }
 
-  @Post('end/:id')
-  async postWorkOut(@Param('id', ParseIntPipe) memberId: number) {
-    return await this.workService.createWorkOut(memberId);
+  @Post('end')
+  async postWorkOut(@CurrentUser() user) {
+    return await this.workService.createWorkOut(user.id);
   }
 }
