@@ -10,6 +10,7 @@ import {
   ParseIntPipe,
   Get,
   UseGuards,
+  ForbiddenException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -61,6 +62,9 @@ export class JournalController {
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser() user,
   ): Promise<GenerateJournalDocxResponseDto> {
+    if (user.role !== 'careWorker') {
+      throw new ForbiddenException('요양보호사만 접근할 수 있습니다.');
+    }
     try {
       const result = await this.journalService.summarizeJournal({
         id,
@@ -96,6 +100,9 @@ export class JournalController {
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser() user,
   ): Promise<GenerateJournalPdfResponseDto> {
+    if (user.role !== 'careWorker') {
+      throw new ForbiddenException('요양보호사만 접근할 수 있습니다.');
+    }
     try {
       return await this.journalService.convertJournalPdf(id);
     } catch (error) {
@@ -120,7 +127,11 @@ export class JournalController {
   })
   async downloadDocx(
     @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user,
   ): Promise<DownloadUrlResponseDto> {
+    if (user.role !== 'careWorker') {
+      throw new ForbiddenException('요양보호사만 접근할 수 있습니다.');
+    }
     try {
       return await this.journalService.getDocxPresignedUrl(id);
     } catch (error) {
@@ -145,7 +156,11 @@ export class JournalController {
   })
   async downloadPdf(
     @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user,
   ): Promise<DownloadUrlResponseDto> {
+    if (user.role !== 'careWorker') {
+      throw new ForbiddenException('요양보호사만 접근할 수 있습니다.');
+    }
     try {
       return await this.journalService.getPdfPresignedUrl(id);
     } catch (error) {
