@@ -3,7 +3,9 @@ import {
   Logger,
   InternalServerErrorException,
   HttpException,
+  ForbiddenException,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
@@ -12,6 +14,7 @@ import { ConfigService } from '@nestjs/config';
 import { GenerateJournalDocxResponseDto } from './dto/generate-journal-docx-response.dto';
 import { S3Service } from '../s3/s3.service';
 import { normalizeStringFields } from './normalize-string-fields';
+import { ClientService } from 'src/client/client.service';
 
 // Journal → python-report 요청용 매핑 유틸 함수 (클래스 정의 위에 선언)
 function mapJournalToRequest(journal: any) {
@@ -49,6 +52,7 @@ export class JournalService {
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
     private readonly s3Service: S3Service,
+    private readonly clientService: ClientService,
   ) {
     this.sttServerUrl = this.configService.get<string>(
       'STT_SERVER_URL',
@@ -207,12 +211,17 @@ export class JournalService {
     }
   }
 
-  async summarizeJournal(id: number) {
-    const journal = await this.prisma.journal.findUnique({
-      where: { id: Number(id) },
-      include: { client: true, careWorker: true },
-    });
-    if (!journal) throw new Error('일지를 찾을 수 없습니다.');
+  async summarizeJournal({
+    id,
+    careWorkerId,
+  }: {
+    id: number;
+    careWorkerId: number;
+  }) {
+    const journal = await this.findJournal({ id });
+    if (journal.careWorkerId !== careWorkerId) {
+      throw new UnauthorizedException('본인만 생성할 수 있습니다.');
+    }
 
     const requestBody = mapJournalToRequest(journal);
 
@@ -342,8 +351,26 @@ export class JournalService {
     return data;
   }
 
-  async modifyTranscript(id: number, editedTranscript: string) {
-    return await this.prisma.journal.update({
+  // 녹음본 수정
+  async modifyTranscript({
+    id,
+    editedTranscript,
+    careWorkerId,
+  }: {
+    id: number;
+    editedTranscript: string;
+    careWorkerId: number;
+  }) {
+    // 1. 일지 조회
+    const journal = await this.findJournal({ id });
+
+    // 2. 본인인지 확인
+    if (journal.careWorkerId !== careWorkerId) {
+      throw new ForbiddenException('해당 일지를 수정할 권한이 없습니다.');
+    }
+
+    // 3. 수정
+    return this.prisma.journal.update({
       where: { id },
       data: {
         editedTranscript,
@@ -351,19 +378,38 @@ export class JournalService {
     });
   }
 
-  async getJournalSummary(id: number) {
+  // 일지 한 개 가져오기
+  async findJournal({ id }: { id: number }) {
     const journal = await this.prisma.journal.findUnique({
-      where: { id: Number(id) },
-      select: {
-        summary: true,
-        recommendations: true,
-        opinion: true,
-        result: true,
-        note: true,
-      },
+      where: { id },
+      include: { client: true, careWorker: true },
     });
-    if (!journal) throw new Error('일지를 찾을 수 없습니다.');
-    // null 방지: 빈 문자열로 변환
+    if (!journal) {
+      throw new NotFoundException('일지를 찾을 수 없습니다.');
+    }
+
+    return journal;
+  }
+
+  // 일지 상세 보기
+  async getJournalSummary({
+    id,
+    careWorkerId,
+    socialWorkerId,
+  }: {
+    id: number;
+    careWorkerId?: number;
+    socialWorkerId?: number;
+  }) {
+    const journal = await this.findJournal({ id });
+
+    if (
+      (socialWorkerId && journal.client.socialWorkerId !== socialWorkerId) ||
+      (careWorkerId && journal.careWorkerId !== careWorkerId)
+    ) {
+      throw new UnauthorizedException('권한이 없습니다.');
+    }
+
     return {
       summary: journal.summary ?? '',
       recommendations: journal.recommendations ?? '',
@@ -373,7 +419,22 @@ export class JournalService {
     };
   }
 
-  async getJournalListByClient(clientId: number) {
+  // client 별 일지 목록
+  async getJournalListByClient({
+    clientId,
+    careWorkerId,
+    socialWorkerId,
+  }: {
+    clientId: number;
+    careWorkerId?: number;
+    socialWorkerId?: number;
+  }) {
+    await this.clientService.fetchClient({
+      id: clientId,
+      socialWorkerId,
+      careWorkerId,
+    });
+
     const journals = await this.prisma.journal.findMany({
       where: { clientId },
       select: {
@@ -382,10 +443,8 @@ export class JournalService {
       },
       orderBy: { createdAt: 'desc' },
     });
-    return journals.map((j) => ({
-      id: j.id,
-      createdAt: j.createdAt,
-    }));
+
+    return journals;
   }
 
   async fetchRawAudio(id: number) {

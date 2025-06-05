@@ -11,8 +11,8 @@ import { CreateClientDto } from './dto/create-client.dto';
 export class ClientService {
   constructor(private prisma: PrismaService) {}
 
-  async createClient(data: CreateClientDto) {
-    const { birthDate, gender, socialWorkerId, careWorkerId, ...otherData } = data;
+  async createClient(data: CreateClientDto, socialWorkerId: number) {
+    const { birthDate, gender, careWorkerId, ...otherData } = data;
 
     if (gender !== '여' && gender !== '남') {
       throw new BadRequestException('성별은 `여` 또는 `남`만 가능합니다.');
@@ -35,7 +35,13 @@ export class ClientService {
     });
   }
 
-  async fetchManyClient(socialWorkerId?: number, careWorkerId?: number) {
+  async fetchManyClient({
+    socialWorkerId,
+    careWorkerId,
+  }: {
+    socialWorkerId?: number;
+    careWorkerId?: number;
+  }) {
     const orConditions: any[] = [];
 
     if (socialWorkerId !== undefined) {
@@ -53,11 +59,15 @@ export class ClientService {
     });
   }
 
-  async fetchClient(
-    id: number,
-    socialWorkerId?: number,
-    careWorkerId?: number,
-  ) {
+  async fetchClient({
+    id,
+    socialWorkerId,
+    careWorkerId,
+  }: {
+    id: number;
+    socialWorkerId?: number;
+    careWorkerId?: number;
+  }) {
     const client = await this.prisma.client.findUnique({ where: { id } });
     if (!client) {
       throw new NotFoundException('해당 노인은 존재하지 않습니다.');

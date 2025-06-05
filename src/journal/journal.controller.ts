@@ -9,12 +9,15 @@ import {
   Body,
   ParseIntPipe,
   Get,
+  UseGuards,
+  ForbiddenException,
 } from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
   ApiResponse,
   ApiOkResponse,
+  ApiBearerAuth,
 } from '@nestjs/swagger';
 import { JournalService } from './journal.service';
 import {
@@ -24,7 +27,11 @@ import {
 import { TranscriptUpdateDto } from './dto/update-transcript.dto';
 import { JournalSummaryResponseDto } from './dto/journal-summary-response.dto';
 import { DownloadUrlResponseDto } from './dto/download-url-response.dto';
+import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
+import { CurrentUser } from 'src/auth/decorators/current-user.decorator';
 
+@UseGuards(JwtAuthGuard)
+@ApiBearerAuth('JWT')
 @ApiTags('journal')
 @Controller('journal')
 export class JournalController {
@@ -52,10 +59,17 @@ export class JournalController {
     description: '서버 오류',
   })
   async summarizeJournal(
-    @Param('id') id: number,
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user,
   ): Promise<GenerateJournalDocxResponseDto> {
+    if (user.role !== 'careWorker') {
+      throw new ForbiddenException('요양보호사만 접근할 수 있습니다.');
+    }
     try {
-      const result = await this.journalService.summarizeJournal(id);
+      const result = await this.journalService.summarizeJournal({
+        id,
+        careWorkerId: user.id,
+      });
       return result;
     } catch (error) {
       if (error instanceof HttpException) throw error;
@@ -83,8 +97,12 @@ export class JournalController {
     description: '서버 오류',
   })
   async convertJournalPdf(
-    @Param('id') id: number,
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user,
   ): Promise<GenerateJournalPdfResponseDto> {
+    if (user.role !== 'careWorker') {
+      throw new ForbiddenException('요양보호사만 접근할 수 있습니다.');
+    }
     try {
       return await this.journalService.convertJournalPdf(id);
     } catch (error) {
@@ -107,7 +125,13 @@ export class JournalController {
     description: 'DOCX presigned url 반환',
     type: DownloadUrlResponseDto,
   })
-  async downloadDocx(@Param('id') id: number): Promise<DownloadUrlResponseDto> {
+  async downloadDocx(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user,
+  ): Promise<DownloadUrlResponseDto> {
+    if (user.role !== 'careWorker') {
+      throw new ForbiddenException('요양보호사만 접근할 수 있습니다.');
+    }
     try {
       return await this.journalService.getDocxPresignedUrl(id);
     } catch (error) {
@@ -130,7 +154,13 @@ export class JournalController {
     description: 'PDF presigned url 반환',
     type: DownloadUrlResponseDto,
   })
-  async downloadPdf(@Param('id') id: number): Promise<DownloadUrlResponseDto> {
+  async downloadPdf(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user,
+  ): Promise<DownloadUrlResponseDto> {
+    if (user.role !== 'careWorker') {
+      throw new ForbiddenException('요양보호사만 접근할 수 있습니다.');
+    }
     try {
       return await this.journalService.getPdfPresignedUrl(id);
     } catch (error) {
@@ -155,8 +185,13 @@ export class JournalController {
   async updateTranscript(
     @Param('id', ParseIntPipe) id: number,
     @Body() { editedTranscript }: TranscriptUpdateDto,
+    @CurrentUser() user,
   ) {
-    return this.journalService.modifyTranscript(id, editedTranscript);
+    return this.journalService.modifyTranscript({
+      id,
+      editedTranscript,
+      careWorkerId: user.id,
+    });
   }
 
   @Get(':id')
@@ -171,10 +206,19 @@ export class JournalController {
     type: JournalSummaryResponseDto,
   })
   async getJournalSummary(
-    @Param('id') id: number,
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user,
   ): Promise<JournalSummaryResponseDto> {
+    // 역할에 따라 적절한 ID를 넘김
+    const socialWorkerId = user.role === 'socialWorker' ? user.id : undefined;
+    const careWorkerId = user.role === 'careWorker' ? user.id : undefined;
+
     try {
-      return await this.journalService.getJournalSummary(id);
+      return await this.journalService.getJournalSummary({
+        id,
+        socialWorkerId,
+        careWorkerId,
+      });
     } catch (error) {
       if (error instanceof HttpException) throw error;
       throw new HttpException(
