@@ -85,7 +85,7 @@ model WorkEvent {
   id        Int           @id @default(autoincrement())
   workId    Int
   type      WorkEventType
-  time      DateTime
+  workTime    DateTime      @db.Time
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
   work      Work          @relation(fields: [workId], references: [id])
