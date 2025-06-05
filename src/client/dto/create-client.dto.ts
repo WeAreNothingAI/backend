@@ -47,11 +47,6 @@ export class CreateClientDto {
   @ApiProperty()
   @IsInt()
   @IsNotEmpty()
-  socialWorkerId: number;
-
-  @ApiProperty()
-  @IsInt()
-  @IsNotEmpty()
   careWorkerId: number;
 
   @ApiProperty({ required: false })
