@@ -132,6 +132,8 @@ def create_weekly_report_app() -> FastAPI:
                 "careLevel": gpt_result.get("careLevel", ""),
                 "guardianContact": gpt_result.get("guardianContact", ""),
                 "reportDate": gpt_result.get("reportDate", ""),
+                "periodStart": getattr(data, "periodStart", getattr(data, "period_start", "")),
+                "periodEnd": getattr(data, "periodEnd", getattr(data, "period_end", "")),
                 "socialWorkerName": gpt_result.get("socialWorkerName", ""),
                 "journalSummary": gpt_result.get("journalSummary", []),
                 "summary": gpt_result.get("summary", ""),
@@ -182,6 +184,8 @@ def create_weekly_report_app() -> FastAPI:
                 "pdf_url": pdf_url,
                 "exportedDocx": docx_url,
                 "exportedPdf": pdf_url,
+                "periodStart": context["periodStart"],
+                "periodEnd": context["periodEnd"],
                 **{
                     "title": context["title"],
                     "clientName": context["clientName"],
