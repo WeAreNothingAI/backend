@@ -242,7 +242,16 @@ export class JournalController {
     status: 404,
     description: '해당 일지는 존재하지 않습니다.',
   })
-  async getRawAudioUrl(@Param('id', ParseIntPipe) id: number) {
-    return await this.journalService.findRawAudio(id);
+  @ApiResponse({
+    status: 403,
+    description: '본인이 녹음한 일지가 아닙니다.',
+  })
+  async getRawAudioUrl(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user,
+  ) {
+    const careWorkerId = user.role === 'careWorker' ? user.id : undefined;
+
+    return await this.journalService.findRawAudio(id, careWorkerId);
   }
 }

@@ -447,8 +447,11 @@ export class JournalService {
     return journals;
   }
 
-  async findRawAudio(id: number) {
+  async findRawAudio(id: number, careWorkerId: number) {
     const journal = await this.findJournal({ id });
+    if (!careWorkerId || journal.careWorkerId !== careWorkerId) {
+      throw new ForbiddenException('본인이 녹음한 일지가 아닙니다.');
+    }
 
     return {
       rawAudioUrl: journal.rawAudioUrl,
