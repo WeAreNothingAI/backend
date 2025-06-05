@@ -120,7 +120,7 @@ export class ClientController {
     const socialWorkerId = user.role === 'socialWorker' ? user.id : undefined;
     const careWorkerId = user.role === 'careWorker' ? user.id : undefined;
 
-    return this.journalService.getJournalListByClient({
+    return this.journalService.findJournalListByClient({
       clientId,
       socialWorkerId,
       careWorkerId,
