@@ -311,7 +311,7 @@ export class JournalService {
     }
   }
 
-  async getDocxPresignedUrl(id: number) {
+  async findDocxPresignedUrl(id: number) {
     // 1. DB에서 docx 파일명(S3 Key) 조회
     const journal = await this.prisma.journal.findUnique({
       where: { id: Number(id) },
@@ -331,7 +331,7 @@ export class JournalService {
     return data;
   }
 
-  async getPdfPresignedUrl(id: number) {
+  async findPdfPresignedUrl(id: number) {
     // 1. DB에서 pdf 파일명(S3 Key) 조회
     const journal = await this.prisma.journal.findUnique({
       where: { id: Number(id) },
@@ -392,7 +392,7 @@ export class JournalService {
   }
 
   // 일지 상세 보기
-  async getJournalSummary({
+  async findJournalSummary({
     id,
     careWorkerId,
     socialWorkerId,
@@ -420,7 +420,7 @@ export class JournalService {
   }
 
   // client 별 일지 목록
-  async getJournalListByClient({
+  async findJournalListByClient({
     clientId,
     careWorkerId,
     socialWorkerId,
@@ -447,11 +447,8 @@ export class JournalService {
     return journals;
   }
 
-  async fetchRawAudio(id: number) {
-    const journal = await this.prisma.journal.findUnique({ where: { id } });
-    if (!journal) {
-      throw new NotFoundException('해당 일지는 존재하지 않습니다.');
-    }
+  async findRawAudio(id: number) {
+    const journal = await this.findJournal({ id });
 
     return {
       rawAudioUrl: journal.rawAudioUrl,

@@ -133,7 +133,7 @@ export class JournalController {
       throw new ForbiddenException('요양보호사만 접근할 수 있습니다.');
     }
     try {
-      return await this.journalService.getDocxPresignedUrl(id);
+      return await this.journalService.findDocxPresignedUrl(id);
     } catch (error) {
       if (error instanceof HttpException) throw error;
       throw new HttpException(
@@ -162,7 +162,7 @@ export class JournalController {
       throw new ForbiddenException('요양보호사만 접근할 수 있습니다.');
     }
     try {
-      return await this.journalService.getPdfPresignedUrl(id);
+      return await this.journalService.findPdfPresignedUrl(id);
     } catch (error) {
       if (error instanceof HttpException) throw error;
       throw new HttpException(
@@ -214,7 +214,7 @@ export class JournalController {
     const careWorkerId = user.role === 'careWorker' ? user.id : undefined;
 
     try {
-      return await this.journalService.getJournalSummary({
+      return await this.journalService.findJournalSummary({
         id,
         socialWorkerId,
         careWorkerId,
@@ -243,6 +243,6 @@ export class JournalController {
     description: '해당 일지는 존재하지 않습니다.',
   })
   async getRawAudioUrl(@Param('id', ParseIntPipe) id: number) {
-    return await this.journalService.fetchRawAudio(id);
+    return await this.journalService.findRawAudio(id);
   }
 }
