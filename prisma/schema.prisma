@@ -62,6 +62,7 @@ model Client {
   notes           String?
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
+  reports         Report[]
 
   // Relations
   careWorker      Member?      @relation("CareWorkerClients", fields: [careWorkerId], references: [id], onDelete: Cascade)
@@ -107,11 +108,12 @@ model Journal {
   note            String?
   exportedPdf     String?
   exportedDocx    String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  issues          String?  @db.VarChar
-  careWorker      Member   @relation("CareWorkerJournals", fields: [careWorkerId], references: [id])
-  client          Client   @relation(fields: [clientId], references: [id])
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  careWorker      Member    @relation("CareWorkerJournals", fields: [careWorkerId], references: [id])
+  client          Client    @relation(fields:[clientId], references: [id])
 }
 
 model Report {
@@ -132,7 +134,8 @@ model Report {
   evaluation     String   // 복지사 평가 및 제언
   suggestion     String   // 추천 사항
 
-  exported       String?
+  exportedPdf    String?
+  exportedDocx   String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
   careWorker     Member   @relation("Reports_CareWorker", fields: [careWorkerId], references: [id])
