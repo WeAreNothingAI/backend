@@ -45,30 +45,35 @@ def convert_docx_to_pdf(docx_path, pdf_path):
         except Exception as e:
             raise Exception(f"LibreOffice PDF 변환 실패(Linux/Unix): {e}")
 
-def gpt_weekly_report_all(journalSummary):
+def gpt_weekly_report_all(journalSummary, clientName, birthDate, guardianContact, reportDate, socialWorkerName):
     text = "\n".join([
         f"{j['date']} {j['careWorker']} {j['service']} {j['notes']}" for j in journalSummary
     ])
     prompt = (
         f"아래는 요양보호 일지 5개의 요약이야.\n{text}\n\n"
-        "이 내용을 바탕으로 주간보고서의 모든 기본 정보 항목(보고서 제목, 대상자 이름, 생년월일, 요양 등급, 보호자 연락처, 보고서 작성일, 작성자(복지사))와 "
-        "건강 및 생활상태 요약, 위험요소, 복지사 평가 및 제언, 추천사항을 아래 JSON 형식으로 만들어줘. "
-        "각 항목은 대화에 정보가 없더라도 맥락을 바탕으로 반드시 추정해서 한 문장 이상으로 작성해줘. "
-        "특히 기본 정보 항목도 빈 문자열로 두지 말고, 대화에서 유추해서라도 반드시 채워줘. "
-        "그리고, 아래 5개 일지를 표에 넣을 수 있도록 각 일지별로 date, careWorker, service, notes를 한 줄로 요약해서 배열(journalSummary)로 만들어줘. "
-        "또한, 아래 항목도 반드시 포함해서 작성해줘.\n"
-        "physicalStatus: 신체 상태 변화 한 문장 요약\n"
-        "mentalStatus: 정신/정서 상태 한 문장 요약\n"
-        "mealSleepPattern: 식사 및 수면 패턴 한 문장 요약\n"
-        "아래 JSON 형식으로 반환해줘.\n"
+        "아래 항목들은 반드시 모두 포함해서 반환해줘. (누락 없이, 빈 값이라도 반드시 포함)\n"
+        "기본 정보(대상자 이름, 생년월일, 보호자 연락처, 보고서 작성일, 작성자(복지사))는 아래 입력값을 그대로 사용하고, "
+        "나머지 항목(요양 등급, 건강 및 생활상태 요약, 위험요소, 평가 및 제언, 추천사항, 신체 상태 변화, 정신/정서 상태, 식사 및 수면 패턴, 일지 요약 표)은 네가 생성해줘.\n"
+        "기본 정보는 절대 임의로 생성하지 말고, 아래 입력값을 그대로 반환해.\n"
+        "입력값:\n"
+        f"clientName: {clientName}\n"
+        f"birthDate: {birthDate}\n"
+        f"guardianContact: {guardianContact}\n"
+        f"reportDate: {reportDate}\n"
+        f"socialWorkerName: {socialWorkerName}\n"
+        "추가 지침:\n"
+        "- 보고서 제목은 반드시 'YYYY년 M월 N주차 요양보호 주간보고서' 형식으로, 기간(periodStart~periodEnd) 또는 일지들의 날짜(journalSummary의 date)를 바탕으로 주차를 자동으로 추론해서 작성해줘.\n"
+        "- '요양보호 일지 요약' 표 부분은 간결하게, 불필요하게 길지 않게 작성해줘.\n"
+        "- 아래 세 항목(3. 건강 및 생활 상태 요약, 4. 위험 요소 및 주의사항, 5. 복지사 평가 및 제언)은 반드시 존댓말(정중한 서술체)로, 실무적으로 신뢰감 있게, 충분히 상세하게 작성해줘. (짧은 단문, 명령문, 생략체 금지)\n"
+        "- 아래 JSON 형식으로 반환해줘. (코드블록 없이, 설명 없이, key와 value 모두 쌍따옴표로 감싸고, 모든 항목을 반드시 포함)\n"
         "{\n"
         "  \"title\": \"\",\n"
-        "  \"clientName\": \"\",\n"
-        "  \"birthDate\": \"\",\n"
+        "  \"clientName\": \"입력값 그대로\",\n"
+        "  \"birthDate\": \"입력값 그대로\",\n"
         "  \"careLevel\": \"\",\n"
-        "  \"guardianContact\": \"\",\n"
-        "  \"reportDate\": \"\",\n"
-        "  \"socialWorkerName\": \"\",\n"
+        "  \"guardianContact\": \"입력값 그대로\",\n"
+        "  \"reportDate\": \"입력값 그대로\",\n"
+        "  \"socialWorkerName\": \"입력값 그대로\",\n"
         "  \"summary\": \"\",\n"
         "  \"riskNotes\": \"\",\n"
         "  \"evaluation\": \"\",\n"
@@ -120,21 +125,28 @@ def create_weekly_report_app() -> FastAPI:
     )
 
     @app.post("/")
-    def generate_weekly_report(data: WeeklyReportRequest):
+    def generate_weekly_report(data: dict):
         try:
-            # GPT로 모든 항목 자동 생성
-            gpt_result = gpt_weekly_report_all(data.journalSummary)
+            # GPT로 모든 항목 자동 생성 (기본 정보는 입력값 그대로 전달)
+            gpt_result = gpt_weekly_report_all(
+                data["journalSummary"],
+                data.get("clientName", ""),
+                data.get("birthDate", ""),
+                data.get("guardianContact", ""),
+                data.get("reportDate", ""),
+                data.get("socialWorkerName", "")
+            )
             tpl = DocxTemplate("주간보고서양식.docx")
             context = {
                 "title": gpt_result.get("title", ""),
-                "clientName": gpt_result.get("clientName", ""),
-                "birthDate": gpt_result.get("birthDate", ""),
+                "clientName": data.get("clientName", ""),
+                "birthDate": data.get("birthDate", ""),
                 "careLevel": gpt_result.get("careLevel", ""),
-                "guardianContact": gpt_result.get("guardianContact", ""),
-                "reportDate": gpt_result.get("reportDate", ""),
-                "periodStart": getattr(data, "periodStart", getattr(data, "period_start", "")),
-                "periodEnd": getattr(data, "periodEnd", getattr(data, "period_end", "")),
-                "socialWorkerName": gpt_result.get("socialWorkerName", ""),
+                "guardianContact": data.get("guardianContact", ""),
+                "reportDate": data.get("reportDate", ""),
+                "periodStart": data.get("periodStart", data.get("period_start", "")),
+                "periodEnd": data.get("periodEnd", data.get("period_end", "")),
+                "socialWorkerName": data.get("socialWorkerName", ""),
                 "journalSummary": gpt_result.get("journalSummary", []),
                 "summary": gpt_result.get("summary", ""),
                 "riskNotes": gpt_result.get("riskNotes", ""),

@@ -33,28 +33,24 @@ export class ReportController {
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({
-    summary: '주간보고서 생성',
-    description: '일지 id 배열(journalIds) 또는 기간+어르신(periodStart, periodEnd, clientId) 중 하나로 주간보고서(docx/pdf)를 자동 생성합니다.',
+    summary: '주간보고서 생성 (어르신별 자동 그룹화 지원)',
+    description: '일지 id 배열(journalIds, 여러 어르신 섞여도 됨) 또는 기간만 받아, 어르신별로 자동 그룹화화하여 주간보고서를 각각 생성합니다.',
   })
   @ApiResponse({
     status: HttpStatus.CREATED,
-    description: '주간보고서 docx/pdf 파일 생성 성공',
+    description: '주간보고서 docx/pdf 파일 생성 성공 (배열)',
     type: CreateWeeklyReportResponseDto,
+    isArray: true,
   })
   @ApiBody({
     schema: {
       oneOf: [
-        {
-          example: {
-            journalIds: [1, 2, 3, 4, 5]
-          }
-        },
-        {
-          example: {
-            periodStart: '2025-05-01',
-            periodEnd: '2025-05-07',
-            clientId: 123
-          }
+        { example:
+           { journalIds: [1,2,3,4,5] } 
+          },
+        { example:
+          { periodStart: '2025-05-01', periodEnd: '2025-05-07' 
+          } 
         }
       ]
     }
@@ -62,11 +58,11 @@ export class ReportController {
   async create(
     @Body() dto: CreateWeeklyReportFlexibleDto,
     @CurrentUser() user,
-  ): Promise<CreateWeeklyReportResponseDto> {
+  ): Promise<CreateWeeklyReportResponseDto[]> {
     if (user.role !== 'socialWorker') {
       throw new ForbiddenException('복지사만 접근할 수 있습니다.');
     }
-    return this.reportService.createWeeklyReport(dto, user);
+    return this.reportService.createWeeklyReportsGrouped(dto, user);
   }
 
   @Get(':id')
