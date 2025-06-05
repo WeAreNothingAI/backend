@@ -3,6 +3,9 @@ import {
   Logger,
   InternalServerErrorException,
   HttpException,
+  ForbiddenException,
+  NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
@@ -10,11 +13,16 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
 import { GenerateJournalDocxResponseDto } from './dto/generate-journal-docx-response.dto';
 import { S3Service } from '../s3/s3.service';
+import { normalizeStringFields } from './normalize-string-fields';
+import { ClientService } from 'src/client/client.service';
 
 // Journal → python-report 요청용 매핑 유틸 함수 (클래스 정의 위에 선언)
 function mapJournalToRequest(journal: any) {
   return {
-    text: journal.transcript,
+    text:
+      journal.editedTranscript && journal.editedTranscript.trim() !== ''
+        ? journal.editedTranscript
+        : journal.transcript,
     date: journal.createdAt.toISOString().slice(0, 10),
     service: '',
     manager: journal.careWorker?.name ?? '',
@@ -44,6 +52,7 @@ export class JournalService {
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
     private readonly s3Service: S3Service,
+    private readonly clientService: ClientService,
   ) {
     this.sttServerUrl = this.configService.get<string>(
       'STT_SERVER_URL',
@@ -202,12 +211,17 @@ export class JournalService {
     }
   }
 
-  async summarizeJournal(id: number) {
-    const journal = await this.prisma.journal.findUnique({
-      where: { id: Number(id) },
-      include: { client: true, careWorker: true },
-    });
-    if (!journal) throw new Error('일지를 찾을 수 없습니다.');
+  async summarizeJournal({
+    id,
+    careWorkerId,
+  }: {
+    id: number;
+    careWorkerId: number;
+  }) {
+    const journal = await this.findJournal({ id });
+    if (journal.careWorkerId !== careWorkerId) {
+      throw new UnauthorizedException('본인만 생성할 수 있습니다.');
+    }
 
     const requestBody = mapJournalToRequest(journal);
 
@@ -236,12 +250,16 @@ export class JournalService {
       file: data.file,
       docx_url: data.docx_url,
       pdf_url: data.pdf_url,
-      summary: data.summary,
-      recommendations: data.recommendations,
-      opinion: data.opinion,
-      result: data.result,
-      note: data.note,
-      updated,
+      summary: data.summary ?? '',
+      recommendations: data.recommendations ?? '',
+      opinion: data.opinion ?? '',
+      result: data.result ?? '',
+      note: data.note ?? '',
+      updated: normalizeStringFields({
+        ...updated,
+        createdAt: updated.createdAt?.toISOString?.() ?? '',
+        updatedAt: updated.updatedAt?.toISOString?.() ?? '',
+      }) as import('./dto/journal-updated.dto').JournalUpdatedDto,
     };
   }
 
@@ -284,8 +302,11 @@ export class JournalService {
       const status = error?.status || error?.response?.status || 500;
       // OS별 안내 메시지 추가
       let osHint = '';
-      if (msg.includes('docx2pdf')) osHint = ' (윈도우 환경: Microsoft Word 및 docx2pdf 패키지가 필요합니다)';
-      if (msg.includes('LibreOffice')) osHint = ' (리눅스 환경: LibreOffice가 설치되어 있어야 합니다)';
+      if (msg.includes('docx2pdf'))
+        osHint =
+          ' (윈도우 환경: Microsoft Word 및 docx2pdf 패키지가 필요합니다)';
+      if (msg.includes('LibreOffice'))
+        osHint = ' (리눅스 환경: LibreOffice가 설치되어 있어야 합니다)';
       throw new HttpException(msg + osHint, status);
     }
   }
@@ -328,5 +349,114 @@ export class JournalService {
       ),
     );
     return data;
+  }
+
+  // 녹음본 수정
+  async modifyTranscript({
+    id,
+    editedTranscript,
+    careWorkerId,
+  }: {
+    id: number;
+    editedTranscript: string;
+    careWorkerId: number;
+  }) {
+    // 1. 일지 조회
+    const journal = await this.findJournal({ id });
+
+    // 2. 본인인지 확인
+    if (journal.careWorkerId !== careWorkerId) {
+      throw new ForbiddenException('해당 일지를 수정할 권한이 없습니다.');
+    }
+
+    // 3. 수정
+    return this.prisma.journal.update({
+      where: { id },
+      data: {
+        editedTranscript,
+      },
+    });
+  }
+
+  // 일지 한 개 가져오기
+  async findJournal({ id }: { id: number }) {
+    const journal = await this.prisma.journal.findUnique({
+      where: { id },
+      include: { client: true, careWorker: true },
+    });
+    if (!journal) {
+      throw new NotFoundException('일지를 찾을 수 없습니다.');
+    }
+
+    return journal;
+  }
+
+  // 일지 상세 보기
+  async getJournalSummary({
+    id,
+    careWorkerId,
+    socialWorkerId,
+  }: {
+    id: number;
+    careWorkerId?: number;
+    socialWorkerId?: number;
+  }) {
+    // const journal = await this.prisma.journal.findUnique({
+    //   where: { id: Number(id) },
+    //   select: {
+    //     summary: true,
+    //     recommendations: true,
+    //     opinion: true,
+    //     result: true,
+    //     note: true,
+    //   },
+    // });
+    // if (!journal) throw new Error('일지를 찾을 수 없습니다.');
+    // // null 방지: 빈 문자열로 변환
+
+    const journal = await this.findJournal({ id });
+
+    if (
+      (socialWorkerId && journal.client.socialWorkerId !== socialWorkerId) ||
+      (careWorkerId && journal.careWorkerId !== careWorkerId)
+    ) {
+      throw new UnauthorizedException('권한이 없습니다.');
+    }
+
+    return {
+      summary: journal.summary ?? '',
+      recommendations: journal.recommendations ?? '',
+      opinion: journal.opinion ?? '',
+      result: journal.result ?? '',
+      note: journal.note ?? '',
+    };
+  }
+
+  // client 별 일지 목록
+  async getJournalListByClient({
+    clientId,
+    careWorkerId,
+    socialWorkerId,
+  }: {
+    clientId: number;
+    careWorkerId?: number;
+    socialWorkerId?: number;
+  }) {
+    await this.clientService.fetchClient({
+      id: clientId,
+      socialWorkerId,
+      careWorkerId,
+    });
+
+    const journals = await this.prisma.journal.findMany({
+      where: { clientId },
+      select: {
+        id: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return journals;
   }
 }

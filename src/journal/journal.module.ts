@@ -1,27 +1,22 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { JournalController } from './journal.controller';
 import { JournalService } from './journal.service';
-import { HttpModule } from '@nestjs/axios';
 import { JournalGateway } from './journal.gateway';
-import { PrismaService } from 'src/prisma/prisma.service';
-import { ConfigService } from '@nestjs/config';
-import { ConfigModule } from '@nestjs/config';
-import { S3Module } from '../s3/s3.module';
+import { PrismaService } from '../prisma/prisma.service';
+import { HttpModule } from '@nestjs/axios';
+import { S3Service } from '../s3/s3.service';
+import { ClientService } from 'src/client/client.service';
 
 @Module({
-  imports: [
-    HttpModule.registerAsync({
-      useFactory: (configService: ConfigService) => ({
-        timeout: configService.get('STT_TIMEOUT', 5000),
-        maxRedirects: 5,
-      }),
-      inject: [ConfigService],
-    }),
-    ConfigModule,
-    S3Module,
-  ],
+  imports: [HttpModule, forwardRef(() => JournalModule)],
   controllers: [JournalController],
-  providers: [JournalService, JournalGateway, PrismaService],
+  providers: [
+    JournalService,
+    JournalGateway,
+    PrismaService,
+    S3Service,
+    ClientService,
+  ],
   exports: [JournalService],
 })
 export class JournalModule {}
