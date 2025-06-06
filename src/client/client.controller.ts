@@ -7,8 +7,10 @@ import {
   HttpStatus,
   Param,
   ParseIntPipe,
+  Patch,
   Post,
   Put,
+  UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
 import { ClientService } from './client.service';
@@ -27,7 +29,10 @@ import { JournalService } from '../journal/journal.service';
 import { JournalListItemDto } from '../journal/dto/journal-list-item.dto';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { CurrentUser } from 'src/auth/decorators/current-user.decorator';
-import { UpdateClientDto } from './dto/update-client.dto';
+import {
+  UpdateClientByCareWorkerDto,
+  UpdateClientDto,
+} from './dto/update-client.dto';
 
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth('JWT')
@@ -164,6 +169,40 @@ export class ClientController {
       socialWorkerId,
       careWorkerId,
       data,
+    });
+  }
+
+  @Patch(':id/care-worker')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: '특정 노인의 담당 요양보호사 수정',
+    description: '특정 노인의 담당 요양보호사를 변경합니다.',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: '해당 노인 담당 요양보호사 변경 성공',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: '해당 노인은 존재하지 않습니다.',
+  })
+  @ApiResponse({
+    status: HttpStatus.UNAUTHORIZED,
+    description: '권한이 없습니다.',
+  })
+  async patchClientByCareWorker(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user,
+    @Body() { careWorkerId }: UpdateClientByCareWorkerDto,
+  ) {
+    if (user.role !== 'socialWorker') {
+      throw new UnauthorizedException('복지사만 수정할 수 있습니다.');
+    }
+
+    return this.clientService.updateClientByCareWorker({
+      id,
+      socialWorkerId: user.id,
+      careWorkerId,
     });
   }
 }

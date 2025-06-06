@@ -182,4 +182,21 @@ export class ClientService {
       data: { birthDate: parsedDate, ...otherData },
     });
   }
+
+  async updateClientByCareWorker({
+    id,
+    socialWorkerId,
+    careWorkerId,
+  }: {
+    id: number;
+    socialWorkerId: number;
+    careWorkerId: number;
+  }) {
+    await this.findClient({ id, socialWorkerId });
+
+    return await this.prisma.client.update({
+      where: { id },
+      data: { careWorkerId },
+    });
+  }
 }

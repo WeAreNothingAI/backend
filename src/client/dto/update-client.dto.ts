@@ -5,6 +5,7 @@ import {
   IsNotEmpty,
   IsOptional,
   Matches,
+  IsNumber,
 } from 'class-validator';
 
 export class UpdateClientDto {
@@ -42,4 +43,11 @@ export class UpdateClientDto {
   @IsString()
   @IsOptional()
   notes?: string;
+}
+
+export class UpdateClientByCareWorkerDto {
+  @ApiProperty()
+  @IsNumber()
+  @IsNotEmpty()
+  careWorkerId: number;
 }
