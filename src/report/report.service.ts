@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+  BadRequestException
+} from '@nestjs/common';
 import axios from 'axios';
 import { CreateReportDto } from './dto/create-report.dto';
 import { CreateWeeklyReportFlexibleDto } from './dto/create-weekly-report-flexible.dto';
@@ -8,6 +13,7 @@ import { normalizeStringFields } from 'src/journal/normalize-string-fields';
 import * as dayjs from 'dayjs';
 import * as utc from 'dayjs/plugin/utc';
 import * as timezone from 'dayjs/plugin/timezone';
+import { DownloadUrlResponseDto } from '../journal/dto/download-url-response.dto';
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
@@ -42,8 +48,13 @@ export class ReportService {
     return data;
   }
 
+  /**
+   * [내부 전용] 단일 어르신 주간보고서 생성
+   * - 반드시 clientId가 필요함 (자동 그룹핑된 각 어르신별로만 호출)
+   * - 외부 API에서는 직접 호출하지 않음
+   */
   async createWeeklyReport(dto: CreateWeeklyReportFlexibleDto, user): Promise<CreateWeeklyReportResponseDto> {
-  
+    
     const nowKST = dayjs().tz('Asia/Seoul');
     let journals;
     let periodStart = dto.periodStart;
@@ -51,15 +62,18 @@ export class ReportService {
     let clientId = dto.clientId;
     if (dto.journalIds && dto.journalIds.length > 0) {
       if (dto.journalIds.length > 5) {
-        throw new Error('최대 5개의 일지만 선택할 수 있습니다.');
+        throw new BadRequestException('최대 5개의 일지만 선택할 수 있습니다.');
       }
       journals = await this.prisma.journal.findMany({
         where: { id: { in: dto.journalIds } },
         include: { careWorker: true },
       });
+      if (!journals || journals.length === 0) {
+        throw new NotFoundException('조건에 맞는 일지가 없습니다.');
+      }
+      clientId = journals[0]?.clientId;
       periodStart = journals[0]?.createdAt.toISOString().slice(0, 10);
       periodEnd = journals[journals.length-1]?.createdAt.toISOString().slice(0, 10);
-      clientId = journals[0]?.clientId;
     } else if (dto.periodStart && dto.periodEnd && dto.clientId) {
       journals = await this.prisma.journal.findMany({
         where: {
@@ -73,8 +87,11 @@ export class ReportService {
         take: 5,
         include: { careWorker: true },
       });
+      if (!journals || journals.length === 0) {
+        throw new NotFoundException('조건에 맞는 일지가 없습니다.');
+      }
     } else {
-      throw new Error('journalIds 또는 기간+clientId 중 하나는 필수입니다.');
+      throw new BadRequestException('journalIds 또는 기간+clientId 중 하나는 필수입니다.');
     }
     if (!journals || journals.length === 0) {
       throw new Error('선택된 기간/조건에 해당하는 일지가 없습니다.');
@@ -105,10 +122,10 @@ export class ReportService {
         periodEnd: periodEnd ? new Date(periodEnd) : journals[journals.length-1]?.createdAt,
         careWorkerId: journals[0]?.careWorkerId ?? 0,
         socialWorkerId: user.id,
-        createdAt: nowKST.toDate(), // << 한국시간 명시적으로 지정
+        createdAt: nowKST.toDate(), 
       }
     });
-    // 보고서 작성일(한국시간)
+    
     const reportDate = nowKST.format('YYYY-MM-DD');
     // FastAPI에 전달 (기본 정보 포함)
     const fastApiPayload = {
@@ -165,7 +182,7 @@ export class ReportService {
     }) as CreateWeeklyReportResponseDto;
   }
 
-  async getWeeklyReportDetail(id: string): Promise<CreateWeeklyReportResponseDto> {
+  async findWeeklyReport(id: string): Promise<CreateWeeklyReportResponseDto> {
     // 실제 DB에서 id로 조회해서 반환
     const report = await this.prisma.report.findUnique({
       where: { id: Number(id) },
@@ -202,16 +219,27 @@ export class ReportService {
     }) as CreateWeeklyReportResponseDto;
   }
 
+  /**
+   * [외부 API용] 복지사 담당 어르신별 자동 그룹핑 주간보고서 생성
+   * - 프론트/외부에서는 기간만 보내면 됨 (clientId 필요 없음)
+   * - 내부적으로 어르신별로 그룹핑 후 createWeeklyReport를 호출
+   */
   async createWeeklyReportsGrouped(
     dto: { journalIds?: number[]; periodStart?: string; periodEnd?: string; clientId?: number },
     user
   ): Promise<CreateWeeklyReportResponseDto[]> {
     let journals: any[] = [];
     if (dto.journalIds && dto.journalIds.length > 0) {
+      if (dto.journalIds.length > 5) {
+        throw new BadRequestException('최대 5개의 일지만 선택할 수 있습니다.');
+      }
       journals = await this.prisma.journal.findMany({
         where: { id: { in: dto.journalIds } },
         include: { careWorker: true, client: true },
       });
+      if (!journals || journals.length === 0) {
+        throw new NotFoundException('조건에 맞는 일지가 없습니다.');
+      }
     } else if (dto.periodStart && dto.periodEnd) {
       journals = await this.prisma.journal.findMany({
         where: {
@@ -222,14 +250,20 @@ export class ReportService {
         },
         include: { careWorker: true, client: true },
       });
+      if (!journals || journals.length === 0) {
+        throw new NotFoundException('조건에 맞는 일지가 없습니다.');
+      }
     } else {
-      throw new Error('journalIds 또는 기간 중 하나는 필수입니다.');
+      throw new BadRequestException('journalIds 또는 기간 중 하나는 필수입니다.');
     }
     // 복지사 담당 어르신만 필터링
-    journals = journals.filter(j => j.client?.socialWorkerId === user.id);
+    const filteredJournals = journals.filter(j => j.client?.socialWorkerId === user.id);
+    if (filteredJournals.length === 0) {
+      throw new ForbiddenException('복지사가 담당하는 어르신의 일지가 없습니다.');
+    }
     // 어르신별 그룹화
     const grouped = new Map<number, any[]>();
-    for (const j of journals) {
+    for (const j of filteredJournals) {
       if (!grouped.has(j.clientId)) grouped.set(j.clientId, []);
       grouped.get(j.clientId)!.push(j);
     }
@@ -240,12 +274,64 @@ export class ReportService {
         .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
         .slice(0, 5);
       if (top5.length === 0) continue;
+      const periodStart = top5[0].createdAt.toISOString().slice(0, 10);
+      const periodEnd = top5[top5.length - 1].createdAt.toISOString().slice(0, 10);
       const res = await this.createWeeklyReport(
-        { journalIds: top5.map(j => j.id) },
+        {
+          journalIds: top5.map(j => j.id),
+          clientId,
+          periodStart,
+          periodEnd,
+        },
         user,
       );
       results.push(res);
     }
+    if (results.length === 0) {
+      throw new NotFoundException('조건에 맞는 주간보고서를 생성할 수 없습니다.');
+    }
     return results;
+  }
+
+  async findWeeklyReportDocxPresignedUrl(id: number): Promise<DownloadUrlResponseDto> {
+    const report = await this.prisma.report.findUnique({ where: { id } });
+    if (!report || !report.exportedDocx)
+      throw new NotFoundException('docx 파일이 존재하지 않습니다.');
+    let fileName = report.exportedDocx as string;
+    if (fileName.includes('/')) fileName = fileName.split('/').pop() as string;
+    try {
+      const { data } = await axios.post(
+        'http://127.0.0.1:5000/download-weekly-docx-url',
+        { file_name: fileName },
+        { timeout: 10000 },
+      );
+      return data as DownloadUrlResponseDto;
+    } catch (error: any) {
+      if (error.response && error.response.status === 404) {
+        throw new NotFoundException('docx 파일이 존재하지 않습니다.');
+      }
+      throw new Error('presigned url 생성 중 서버 오류');
+    }
+  }
+
+  async findWeeklyReportPdfPresignedUrl(id: number): Promise<DownloadUrlResponseDto> {
+    const report = await this.prisma.report.findUnique({ where: { id } });
+    if (!report || !report.exportedPdf)
+      throw new NotFoundException('pdf 파일이 존재하지 않습니다.');
+    let fileName = report.exportedPdf as string;
+    if (fileName.includes('/')) fileName = fileName.split('/').pop() as string;
+    try {
+      const { data } = await axios.post(
+        'http://127.0.0.1:5000/download-weekly-pdf-url',
+        { file_name: fileName },
+        { timeout: 10000 },
+      );
+      return data as DownloadUrlResponseDto;
+    } catch (error: any) {
+      if (error.response && error.response.status === 404) {
+        throw new NotFoundException('pdf 파일이 존재하지 않습니다.');
+      }
+      throw new Error('presigned url 생성 중 서버 오류');
+    }
   }
 }
