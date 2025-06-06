@@ -429,7 +429,7 @@ export class JournalService {
     careWorkerId?: number;
     socialWorkerId?: number;
   }) {
-    await this.clientService.fetchClient({
+    await this.clientService.findClient({
       id: clientId,
       socialWorkerId,
       careWorkerId,

@@ -66,12 +66,15 @@ model Client {
   // Relations
   careWorker      Member?      @relation("CareWorkerClients", fields: [careWorkerId], references: [id], onDelete: Cascade)
   journals        Journal[]
+  works           Work[]
+  reports         Report[]
   socialWorker    Member       @relation("SocialWorkerClients", fields: [socialWorkerId], references: [id], onDelete: Cascade)
 }
 
 model Work {
   id          Int       @id @default(autoincrement())
   memberId    Int
+  clientId    Int
   workDate    DateTime  @db.Date
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -79,6 +82,7 @@ model Work {
   // Relations
   member      Member    @relation(fields: [memberId], references: [id])
   events      WorkEvent[]
+  client      Client    @relation(fields: [clientId], references: [id])
 }
 
 model WorkEvent {
@@ -109,7 +113,6 @@ model Journal {
   exportedDocx    String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
-  issues          String?  @db.VarChar
   careWorker      Member   @relation("CareWorkerJournals", fields: [careWorkerId], references: [id])
   client          Client   @relation(fields: [clientId], references: [id])
 }
@@ -120,12 +123,25 @@ model Report {
   periodStart    DateTime
   periodEnd      DateTime
   careWorkerId   Int
-  content        String
-  exported       String?
+
+  // 필수 정보 위주로 명확한 컬럼명
+  title          String   // 보고서 제목
+  clientId       Int      // Client 테이블과 연관 (대상자)
+  careLevel      String   // 요양 등급
+
+  journalSummary Json     // 요양보호 일지 요약 표 (JSON 배열)
+  summary        String   // 건강 및 생활상태 요약 (한 문단)
+  riskNotes      String   // 위험요소 및 주의사항
+  evaluation     String   // 복지사 평가 및 제언
+  suggestion     String   // 추천 사항
+
+  exportedPdf    String?
+  exportedDocx   String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
   careWorker     Member   @relation("Reports_CareWorker", fields: [careWorkerId], references: [id])
   socialWorker   Member   @relation("Reports_SocialWorker", fields: [socialWorkerId], references: [id])
+  client         Client   @relation(fields: [clientId], references: [id])
 }
 
 model Notification {
