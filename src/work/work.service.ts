@@ -8,7 +8,7 @@ import * as timezone from 'dayjs/plugin/timezone';
 export class WorkService {
   constructor(private prisma: PrismaService) {}
 
-  async createWorkIn(memberId: number) {
+  async createWorkIn(memberId: number, clientId: number) {
     const TYPE = 'CLOCK_IN';
 
     dayjs.extend(utc);
@@ -16,7 +16,9 @@ export class WorkService {
 
     // 한국 시간 기준으로 db에 저장
     const nowKST = dayjs().tz('Asia/Seoul');
-    const workDate = nowKST.toDate();
+    const workDate = new Date(
+      dayjs().tz('Asia/Seoul').format('YYYY-MM-DDT00:00:00+09:00'),
+    );
     const workTime = nowKST.format('HH:mm:ss');
 
     // string => Date(한국 시간 기준)
@@ -26,7 +28,7 @@ export class WorkService {
 
     return await this.prisma.$transaction(async (tx) => {
       const work = await tx.work.create({
-        data: { memberId, workDate },
+        data: { memberId, workDate, clientId },
       });
 
       await tx.workEvent.create({
@@ -35,7 +37,7 @@ export class WorkService {
     });
   }
 
-  async createWorkOut(memberId: number) {
+  async createWorkOut(memberId: number, clientId: number) {
     const TYPE = 'CLOCK_OUT';
 
     dayjs.extend(utc);
@@ -53,7 +55,7 @@ export class WorkService {
 
     return await this.prisma.$transaction(async (tx) => {
       const work = await tx.work.create({
-        data: { memberId, workDate },
+        data: { memberId, workDate, clientId },
       });
 
       await tx.workEvent.create({
