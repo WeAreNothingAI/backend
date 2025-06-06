@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateClientDto } from './dto/create-client.dto';
+import { UpdateClientDto } from './dto/update-client.dto';
 
 @Injectable()
 export class ClientService {
@@ -155,5 +156,49 @@ export class ClientService {
     }
 
     return client;
+  }
+
+  async updateClient({
+    id,
+    socialWorkerId,
+    careWorkerId,
+    data,
+  }: {
+    id: number;
+    socialWorkerId: number;
+    careWorkerId: number;
+    data: UpdateClientDto;
+  }) {
+    const { birthDate, ...otherData } = data;
+    await this.findClient({ id, careWorkerId, socialWorkerId });
+
+    let parsedDate;
+    if (birthDate) {
+      parsedDate = new Date(birthDate);
+    }
+
+    return await this.prisma.client.update({
+      where: { id },
+      data: { birthDate: parsedDate, ...otherData },
+    });
+  }
+
+  async updateClientByCareWorker({
+    id,
+    socialWorkerId,
+    careWorkerId,
+  }: {
+    id: number;
+    socialWorkerId: number;
+    careWorkerId: number;
+  }) {
+    await this.findClient({ id, socialWorkerId });
+
+    await this.prisma.client.update({
+      where: { id },
+      data: { careWorkerId },
+    });
+
+    return { success: true, message: '담당 요양보호사가 변경되었습니다.' };
   }
 }
