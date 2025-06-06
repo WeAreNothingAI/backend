@@ -8,6 +8,7 @@ import {
   Param,
   ParseIntPipe,
   Post,
+  Put,
   UseGuards,
 } from '@nestjs/common';
 import { ClientService } from './client.service';
@@ -26,6 +27,7 @@ import { JournalService } from '../journal/journal.service';
 import { JournalListItemDto } from '../journal/dto/journal-list-item.dto';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { CurrentUser } from 'src/auth/decorators/current-user.decorator';
+import { UpdateClientDto } from './dto/update-client.dto';
 
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth('JWT')
@@ -128,6 +130,40 @@ export class ClientController {
       clientId,
       socialWorkerId,
       careWorkerId,
+    });
+  }
+
+  @Put(':id')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: '특정 노인 정보 수정',
+    description: '특정 노인의 정보를 수정합니다.',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: '해당 노인 정보 변경 성공',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: '해당 노인은 존재하지 않습니다.',
+  })
+  @ApiResponse({
+    status: HttpStatus.UNAUTHORIZED,
+    description: '권한이 없습니다.',
+  })
+  async putClient(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user,
+    @Body() data: UpdateClientDto,
+  ) {
+    const socialWorkerId = user.role === 'socialWorker' ? user.id : undefined;
+    const careWorkerId = user.role === 'careWorker' ? user.id : undefined;
+
+    return this.clientService.updateClient({
+      id,
+      socialWorkerId,
+      careWorkerId,
+      data,
     });
   }
 }
