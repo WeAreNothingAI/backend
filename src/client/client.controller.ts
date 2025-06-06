@@ -11,7 +11,10 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ClientService } from './client.service';
-import { CreateClientDto } from './dto/create-client.dto';
+import {
+  ClientListResponseDto,
+  CreateClientDto,
+} from './dto/create-client.dto';
 import {
   ApiOperation,
   ApiResponse,
@@ -63,11 +66,12 @@ export class ClientController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: '노인 정보 목록',
-    description: '본인이 담당하는 노인 정보 목록을 보여줍니다..',
+    description: '본인이 담당하는 노인 정보 목록을 보여줍니다.',
   })
   @ApiResponse({
     status: HttpStatus.OK,
     description: '노인 정보 목록 가져오기 성공',
+    type: [ClientListResponseDto],
   })
   async getManyClient(@CurrentUser() user) {
     const socialWorkerId = user.role === 'socialWorker' ? user.id : undefined;
