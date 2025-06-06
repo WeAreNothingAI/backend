@@ -194,9 +194,11 @@ export class ClientService {
   }) {
     await this.findClient({ id, socialWorkerId });
 
-    return await this.prisma.client.update({
+    await this.prisma.client.update({
       where: { id },
       data: { careWorkerId },
     });
+
+    return { success: true, message: '담당 요양보호사가 변경되었습니다.' };
   }
 }

@@ -199,7 +199,7 @@ export class ClientController {
       throw new UnauthorizedException('복지사만 수정할 수 있습니다.');
     }
 
-    return this.clientService.updateClientByCareWorker({
+    return await this.clientService.updateClientByCareWorker({
       id,
       socialWorkerId: user.id,
       careWorkerId,
