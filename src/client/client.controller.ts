@@ -73,7 +73,7 @@ export class ClientController {
     const socialWorkerId = user.role === 'socialWorker' ? user.id : undefined;
     const careWorkerId = user.role === 'careWorker' ? user.id : undefined;
 
-    return await this.clientService.fetchManyClient({
+    return await this.clientService.findManyClient({
       socialWorkerId,
       careWorkerId,
     });
@@ -99,7 +99,7 @@ export class ClientController {
     const socialWorkerId = user.role === 'socialWorker' ? user.id : undefined;
     const careWorkerId = user.role === 'careWorker' ? user.id : undefined;
 
-    return this.clientService.fetchClient({ id, socialWorkerId, careWorkerId });
+    return this.clientService.findClient({ id, socialWorkerId, careWorkerId });
   }
 
   @Get(':clientId/journal')
