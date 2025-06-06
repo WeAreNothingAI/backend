@@ -301,7 +301,7 @@ export class ReportService {
     if (fileName.includes('/')) fileName = fileName.split('/').pop() as string;
     try {
       const { data } = await axios.post(
-        'http://127.0.0.1:5000/download-weekly-docx-url',
+        'http://127.0.0.1:5000/generate-weekly-report/download-weekly-docx-url',
         { file_name: fileName },
         { timeout: 10000 },
       );
@@ -322,7 +322,7 @@ export class ReportService {
     if (fileName.includes('/')) fileName = fileName.split('/').pop() as string;
     try {
       const { data } = await axios.post(
-        'http://127.0.0.1:5000/download-weekly-pdf-url',
+        'http://127.0.0.1:5000/generate-weekly-report/download-weekly-pdf-url',
         { file_name: fileName },
         { timeout: 10000 },
       );

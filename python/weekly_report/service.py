@@ -222,25 +222,33 @@ def create_weekly_report_app() -> FastAPI:
     @app.post("/download-weekly-docx-url")
     def get_weekly_docx_download_url(req: FileDownloadRequest):
         BUCKET_NAME = 'oncare-backend'
-        s3 = boto3.client('s3')
-        docx_s3_key = f"weekly-report/docx/{req.file_name}"
-        url = s3.generate_presigned_url(
-            ClientMethod='get_object',
-            Params={'Bucket': BUCKET_NAME, 'Key': docx_s3_key},
-            ExpiresIn=60 * 10  # 10분
-        )
+        s3 = boto3.client('s3', region_name='ap-northeast-2')
+        file_name = req.file_name.strip()
+        docx_s3_key = f"weekly-report/docx/{file_name}"
+        try:
+            url = s3.generate_presigned_url(
+                ClientMethod='get_object',
+                Params={'Bucket': BUCKET_NAME, 'Key': docx_s3_key},
+                ExpiresIn=60 * 10  # 10분
+            )
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
         return {"download_url": url}
 
     @app.post("/download-weekly-pdf-url")
     def get_weekly_pdf_download_url(req: FileDownloadRequest):
         BUCKET_NAME = 'oncare-backend'
-        s3 = boto3.client('s3')
-        pdf_s3_key = f"weekly-report/pdf/{req.file_name}"
-        url = s3.generate_presigned_url(
-            ClientMethod='get_object',
-            Params={'Bucket': BUCKET_NAME, 'Key': pdf_s3_key},
-            ExpiresIn=60 * 10  # 10분
-        )
+        s3 = boto3.client('s3', region_name='ap-northeast-2')
+        file_name = req.file_name.strip()
+        pdf_s3_key = f"weekly-report/pdf/{file_name}"
+        try:
+            url = s3.generate_presigned_url(
+                ClientMethod='get_object',
+                Params={'Bucket': BUCKET_NAME, 'Key': pdf_s3_key},
+                ExpiresIn=60 * 10  # 10분
+            )
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
         return {"download_url": url}
 
     return app
