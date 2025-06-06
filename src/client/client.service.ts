@@ -139,7 +139,10 @@ export class ClientService {
     socialWorkerId?: number;
     careWorkerId?: number;
   }) {
-    const client = await this.prisma.client.findUnique({ where: { id } });
+    const client = await this.prisma.client.findUnique({
+      where: { id },
+      include: { careWorker: { select: { id: true, name: true } } },
+    });
     if (!client) {
       throw new NotFoundException('해당 노인은 존재하지 않습니다.');
     }
