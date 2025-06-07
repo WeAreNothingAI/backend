@@ -11,7 +11,11 @@ async function bootstrap() {
 
   // CORS 설정
   app.enableCors({
-    origin: ['http://localhost:3000', 'http://localhost:3001'],
+    origin: [
+      'http://localhost:3000', // 프론트엔드 로컬
+      'http://localhost:3001', // 백엔드 로컬
+      'http://oncare-2087995465.ap-northeast-2.elb.amazonaws.com', // 배포 환경
+    ],
     credentials: true,
   });
 
