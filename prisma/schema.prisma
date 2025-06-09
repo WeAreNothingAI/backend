@@ -111,10 +111,12 @@ model Journal {
   note            String?
   exportedPdf     String?
   exportedDocx    String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  careWorker      Member   @relation("CareWorkerJournals", fields: [careWorkerId], references: [id])
-  client          Client   @relation(fields: [clientId], references: [id])
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  careWorker      Member    @relation("CareWorkerJournals", fields: [careWorkerId], references: [id])
+  client          Client    @relation(fields:[clientId], references: [id])
 }
 
 model Report {
