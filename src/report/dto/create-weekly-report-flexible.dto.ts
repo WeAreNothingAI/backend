@@ -6,7 +6,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
  * - 내부: 어르신별 주간보고서 생성 시 clientId, periodStart, periodEnd 등도 같이 넘김
  */
 export class CreateWeeklyReportFlexibleDto {
-  @ApiPropertyOptional({ description: '일지 id 배열 (최대 5개)', example: [1,2,3,4,5] })
+  @ApiPropertyOptional({ description: '일지 id 배열', example: [1,2,3,4,5] })
   journalIds?: number[];
 
   @ApiPropertyOptional({ description: '기간 시작일 (YYYY-MM-DD)', example: '2025-05-01' })

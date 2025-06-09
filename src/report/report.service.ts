@@ -60,10 +60,16 @@ export class ReportService {
     let periodStart = dto.periodStart;
     let periodEnd = dto.periodEnd;
     let clientId = dto.clientId;
-    if (dto.journalIds && dto.journalIds.length > 0) {
-      if (dto.journalIds.length > 5) {
-        throw new BadRequestException('최대 5개의 일지만 선택할 수 있습니다.');
+
+    if (periodStart && periodEnd) {
+      const start = dayjs(periodStart);
+      const end = dayjs(periodEnd);
+      if (end.diff(start, 'day') > 6) {
+        throw new BadRequestException('기간은 최대 7일(1주일)까지만 선택할 수 있습니다.');
       }
+    }
+
+    if (dto.journalIds && dto.journalIds.length > 0) {
       journals = await this.prisma.journal.findMany({
         where: { id: { in: dto.journalIds } },
         include: { careWorker: true },
@@ -84,7 +90,6 @@ export class ReportService {
           clientId: dto.clientId,
         },
         orderBy: { createdAt: 'desc' },
-        take: 5,
         include: { careWorker: true },
       });
       if (!journals || journals.length === 0) {
@@ -228,11 +233,15 @@ export class ReportService {
     dto: { journalIds?: number[]; periodStart?: string; periodEnd?: string; clientId?: number },
     user
   ): Promise<CreateWeeklyReportResponseDto[]> {
+    if (dto.periodStart && dto.periodEnd) {
+      const start = dayjs(dto.periodStart);
+      const end = dayjs(dto.periodEnd);
+      if (end.diff(start, 'day') > 6) {
+        throw new BadRequestException('기간은 최대 7일(1주일)까지만 선택할 수 있습니다.');
+      }
+    }
     let journals: any[] = [];
     if (dto.journalIds && dto.journalIds.length > 0) {
-      if (dto.journalIds.length > 5) {
-        throw new BadRequestException('최대 5개의 일지만 선택할 수 있습니다.');
-      }
       journals = await this.prisma.journal.findMany({
         where: { id: { in: dto.journalIds } },
         include: { careWorker: true, client: true },
@@ -267,18 +276,17 @@ export class ReportService {
       if (!grouped.has(j.clientId)) grouped.set(j.clientId, []);
       grouped.get(j.clientId)!.push(j);
     }
-    // 각 어르신별로 5개 이하 일지씩 주간보고서 생성
+    // 각 어르신별로 모든 일지로 주간보고서 생성 (제한 없음)
     const results: CreateWeeklyReportResponseDto[] = [];
     for (const [clientId, clientJournals] of grouped.entries()) {
-      const top5 = clientJournals
-        .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
-        .slice(0, 5);
-      if (top5.length === 0) continue;
-      const periodStart = top5[0].createdAt.toISOString().slice(0, 10);
-      const periodEnd = top5[top5.length - 1].createdAt.toISOString().slice(0, 10);
+      const sortedJournals = clientJournals
+        .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+      if (sortedJournals.length === 0) continue;
+      const periodStart = sortedJournals[0].createdAt.toISOString().slice(0, 10);
+      const periodEnd = sortedJournals[sortedJournals.length - 1].createdAt.toISOString().slice(0, 10);
       const res = await this.createWeeklyReport(
         {
-          journalIds: top5.map(j => j.id),
+          journalIds: sortedJournals.map(j => j.id),
           clientId,
           periodStart,
           periodEnd,

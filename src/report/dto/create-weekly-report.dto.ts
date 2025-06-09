@@ -15,6 +15,6 @@ export class JournalSummaryDto {
 }
 
 export class CreateWeeklyReportDto {
-  @ApiProperty({ description: '일지 id 배열 (최대 5개)', example: [1,2,3,4,5] })
+  @ApiProperty({ description: '일지 id 배열', example: [1,2,3,4,5] })
   journalIds: number[];
 } 
