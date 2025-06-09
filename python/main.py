@@ -3,6 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from stt.service import create_stt_app
 from report.service import create_report_app
+from weekly_report.service import create_weekly_report_app
 
 def create_app() -> FastAPI:
     app = FastAPI()
@@ -23,6 +24,10 @@ def create_app() -> FastAPI:
     # 리포트 서비스 마운트
     report_app = create_report_app()
     app.mount("/generate-journal-docx", report_app)
+
+    # 주간보고서 서비스 마운트
+    weekly_report_app = create_weekly_report_app()
+    app.mount("/generate-weekly-report", weekly_report_app)
 
     return app
 

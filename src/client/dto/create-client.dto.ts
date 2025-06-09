@@ -2,7 +2,6 @@ import { ApiProperty } from '@nestjs/swagger';
 import {
   IsString,
   IsInt,
-  IsDate,
   IsNotEmpty,
   IsOptional,
   Matches,
@@ -53,4 +52,36 @@ export class CreateClientDto {
   @IsString()
   @IsOptional()
   notes?: string;
+}
+
+export class ClientListResponseDto {
+  @ApiProperty({
+    example: 1,
+    description: '노인 ID',
+  })
+  clientId: number;
+
+  @ApiProperty({
+    example: '홍길동',
+    description: '노인 이름',
+  })
+  clientName: string;
+
+  @ApiProperty({
+    example: true,
+    description: '출근 여부',
+  })
+  attendance: string;
+
+  @ApiProperty({
+    example: 'PM 12:00 ~ PM 3:00',
+    description: '계획 시간',
+  })
+  schedule: string;
+
+  @ApiProperty({
+    example: '미작성',
+    description: '일지 작성 여부',
+  })
+  journalStatus: string;
 }
