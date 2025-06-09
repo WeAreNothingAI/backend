@@ -49,7 +49,9 @@ export class ReportController {
   })
   @ApiResponse({
     status: HttpStatus.BAD_REQUEST,
-    description: '잘못된 요청(입력값 누락/유효하지 않은 값 등)',
+    description: `잘못된 요청(입력값 누락/유효하지 않은 값 등)
+    <br>- journalIds 또는 기간 중 하나는 필수입니다.
+    <br>- 기간은 최대 7일(1주일)까지만 선택할 수 있습니다.`,
     schema: {
       example: { statusCode: 400, message: 'journalIds 또는 기간 중 하나는 필수입니다.', error: 'Bad Request' }
     }
