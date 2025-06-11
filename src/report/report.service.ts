@@ -13,9 +13,13 @@ import { normalizeStringFields } from 'src/journal/normalize-string-fields';
 import * as dayjs from 'dayjs';
 import * as utc from 'dayjs/plugin/utc';
 import * as timezone from 'dayjs/plugin/timezone';
+import * as isSameOrAfter from 'dayjs/plugin/isSameOrAfter';
+import * as isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
 import { DownloadUrlResponseDto } from '../journal/dto/download-url-response.dto';
 dayjs.extend(utc);
 dayjs.extend(timezone);
+dayjs.extend(isSameOrAfter);
+dayjs.extend(isSameOrBefore);
 
 @Injectable()
 export class ReportService {
@@ -54,7 +58,7 @@ export class ReportService {
    * - 외부 API에서는 직접 호출하지 않음
    */
   async createWeeklyReport(dto: CreateWeeklyReportFlexibleDto, user): Promise<CreateWeeklyReportResponseDto> {
-    
+    console.log('[SERVICE] createWeeklyReport 진입, dto.journalIds:', dto.journalIds);
     const nowKST = dayjs().tz('Asia/Seoul');
     let journals;
     let periodStart = dto.periodStart;
@@ -65,40 +69,67 @@ export class ReportService {
       const start = dayjs(periodStart);
       const end = dayjs(periodEnd);
       if (end.diff(start, 'day') > 6) {
+        console.error('[LOG] 기간 7일 초과 에러');
         throw new BadRequestException('기간은 최대 7일(1주일)까지만 선택할 수 있습니다.');
       }
     }
 
-    if (dto.journalIds && dto.journalIds.length > 0) {
-      journals = await this.prisma.journal.findMany({
-        where: { id: { in: dto.journalIds } },
-        include: { careWorker: true },
-      });
-      if (!journals || journals.length === 0) {
-        throw new NotFoundException('조건에 맞는 일지가 없습니다.');
-      }
-      clientId = journals[0]?.clientId;
-      periodStart = journals[0]?.createdAt.toISOString().slice(0, 10);
-      periodEnd = journals[journals.length-1]?.createdAt.toISOString().slice(0, 10);
-    } else if (dto.periodStart && dto.periodEnd && dto.clientId) {
-      journals = await this.prisma.journal.findMany({
-        where: {
-          createdAt: {
-            gte: new Date(dto.periodStart),
-            lte: new Date(dto.periodEnd),
+    try {
+      if (Array.isArray(dto.journalIds) && dto.journalIds.length > 0) {
+        console.log('[LOG] journalIds로 분기');
+        journals = await this.prisma.journal.findMany({
+          where: { id: { in: dto.journalIds } },
+          include: { careWorker: true },
+        });
+        if (!journals || journals.length === 0) {
+          console.error('[LOG] journalIds 조건에 맞는 일지 없음');
+          throw new NotFoundException('조건에 맞는 일지가 없습니다.');
+        }
+        // createdAt 기준 정렬 및 기간 보정
+        if (dto.periodStart && dto.periodEnd) {
+          const periodStartUtc = dayjs.tz(dto.periodStart, 'Asia/Seoul').startOf('day').utc();
+          const periodEndUtc = dayjs.tz(dto.periodEnd, 'Asia/Seoul').endOf('day').utc();
+          journals = journals.filter(j => {
+            const createdAt = dayjs(j.createdAt);
+            return createdAt.isSameOrAfter(periodStartUtc) && createdAt.isSameOrBefore(periodEndUtc);
+          });
+        }
+        journals = journals.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+        if (!journals || journals.length === 0) {
+          console.error('[LOG] journalIds+기간 조건에 맞는 일지 없음');
+          throw new NotFoundException('조건에 맞는 일지가 없습니다.');
+        }
+        clientId = journals[0]?.clientId;
+        periodStart = journals[0]?.createdAt.toISOString().slice(0, 10);
+        periodEnd = journals[journals.length-1]?.createdAt.toISOString().slice(0, 10);
+      } else if (dto.periodStart && dto.periodEnd && dto.clientId) {
+        const periodStartUtc = dayjs.tz(dto.periodStart, 'Asia/Seoul').startOf('day').utc().toDate();
+        const periodEndUtc = dayjs.tz(dto.periodEnd, 'Asia/Seoul').endOf('day').utc().toDate();
+        journals = await this.prisma.journal.findMany({
+          where: {
+            createdAt: {
+              gte: periodStartUtc,
+              lte: periodEndUtc, // 마지막 날짜 23:59:59까지 포함
+            },
+            clientId: dto.clientId,
           },
-          clientId: dto.clientId,
-        },
-        orderBy: { createdAt: 'desc' },
-        include: { careWorker: true },
-      });
-      if (!journals || journals.length === 0) {
-        throw new NotFoundException('조건에 맞는 일지가 없습니다.');
+          orderBy: { createdAt: 'desc' },
+          include: { careWorker: true },
+        });
+        if (!journals || journals.length === 0) {
+          console.error('[LOG] 기간+clientId 조건에 맞는 일지 없음');
+          throw new NotFoundException('조건에 맞는 일지가 없습니다.');
+        }
+      } else {
+        console.error('[LOG] 분기 실패: journalIds/기간+clientId 둘 다 없음');
+        throw new BadRequestException('journalIds 또는 기간+clientId 중 하나는 필수입니다.');
       }
-    } else {
-      throw new BadRequestException('journalIds 또는 기간+clientId 중 하나는 필수입니다.');
+    } catch (err) {
+      console.error('[LOG] createWeeklyReport 내부 에러:', err);
+      throw err;
     }
     if (!journals || journals.length === 0) {
+      console.error('[LOG] 최종적으로 선택된 일지 없음');
       throw new Error('선택된 기간/조건에 해당하는 일지가 없습니다.');
     }
     const journalSummary = journals.map(j => ({
@@ -233,6 +264,7 @@ export class ReportService {
     dto: { journalIds?: number[]; periodStart?: string; periodEnd?: string; clientId?: number },
     user
   ): Promise<CreateWeeklyReportResponseDto[]> {
+    console.log('[SERVICE] createWeeklyReportsGrouped 진입, dto.journalIds:', dto.journalIds);
     if (dto.periodStart && dto.periodEnd) {
       const start = dayjs(dto.periodStart);
       const end = dayjs(dto.periodEnd);
@@ -250,11 +282,14 @@ export class ReportService {
         throw new NotFoundException('조건에 맞는 일지가 없습니다.');
       }
     } else if (dto.periodStart && dto.periodEnd) {
+      // KST → UTC 변환 적용
+      const periodStartUtc = dayjs.tz(dto.periodStart, 'Asia/Seoul').startOf('day').utc().toDate();
+      const periodEndUtc = dayjs.tz(dto.periodEnd, 'Asia/Seoul').endOf('day').utc().toDate();
       journals = await this.prisma.journal.findMany({
         where: {
           createdAt: {
-            gte: new Date(dto.periodStart),
-            lte: new Date(dto.periodEnd),
+            gte: periodStartUtc,
+            lte: periodEndUtc,
           },
         },
         include: { careWorker: true, client: true },
