@@ -74,11 +74,10 @@ export class ReportController {
     schema: {
       oneOf: [
         { example:
-           { journalIds: [1,2,3,4,5] } 
-          },
+          { periodStart: '2025-06-09', periodEnd: '2025-06-13' } 
+        },
         { example:
-          { periodStart: '2025-05-01', periodEnd: '2025-05-07' 
-          } 
+           { journalIds: [1,2,3,4,5] } 
         }
       ]
     }
@@ -87,6 +86,11 @@ export class ReportController {
     @Body() dto: CreateWeeklyReportFlexibleDto,
     @CurrentUser() user,
   ): Promise<CreateWeeklyReportResponseDto[]> {
+    // 빈 배열이면 undefined로 강제 세팅
+    if (Array.isArray(dto.journalIds) && dto.journalIds.length === 0) {
+      dto.journalIds = undefined;
+    }
+    console.log('==== [컨트롤러] dto.journalIds:', dto.journalIds);
     if (user.role !== 'socialWorker') {
       throw new ForbiddenException('복지사만 접근할 수 있습니다.');
     }
