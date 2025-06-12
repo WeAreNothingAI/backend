@@ -466,13 +466,51 @@ export class JournalService {
   }
 
   async findRawAudio(id: number, careWorkerId: number) {
-    const journal = await this.findJournal({ id });
-    if (!careWorkerId || journal.careWorkerId !== careWorkerId) {
-      throw new ForbiddenException('본인이 녹음한 일지가 아닙니다.');
+    const journal = await this.prisma.journal.findFirst({
+      where: {
+        id,
+        careWorkerId,
+      },
+      select: {
+        rawAudioUrl: true,
+      },
+    });
+
+    if (!journal) {
+      throw new NotFoundException('일지를 찾을 수 없습니다.');
     }
 
-    return {
-      rawAudioUrl: journal.rawAudioUrl,
-    };
+    return journal.rawAudioUrl;
+  }
+
+  // 특정 요양보호사의 날짜 범위 내 일지 목록 조회
+  async getJournalListByDateRange(
+    startDate: Date,
+    endDate: Date,
+    careworkerId: number,
+  ) {
+    const journals = await this.prisma.journal.findMany({
+      where: {
+        careWorkerId: careworkerId,
+        createdAt: {
+          gte: startDate,
+          lte: endDate,
+        },
+      },
+      select: {
+        id: true,
+        createdAt: true,
+      },
+      orderBy: {
+        createdAt: 'asc',
+      },
+    });
+
+    // 각 일지를 개별적으로 반환 (날짜별 그룹화 없음)
+    return journals.map((journal) => ({
+      date: journal.createdAt.toISOString().split('T')[0], // YYYY-MM-DD 형식
+      journalId: journal.id,
+      createdAt: journal.createdAt,
+    }));
   }
 }

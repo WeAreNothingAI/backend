@@ -58,8 +58,8 @@ export class AuthController {
 
     // 새 회원가입인 경우와 기존 로그인인 경우를 구분하여 리디렉션
     const redirectUrl = req.isNewUser
-      ? `${process.env.FRONTEND_URL || 'http://localhost:3001'}/auth/signup-success`
-      : `${process.env.FRONTEND_URL || 'http://localhost:3001'}/auth/login-success`;
+      ? `${process.env.FRONTEND_URL || 'http://localhost:3000'}/auth/signup-success`
+      : `${process.env.FRONTEND_URL || 'http://localhost:3000'}/auth/login-success`;
 
     res.redirect(redirectUrl);
   }
@@ -110,13 +110,13 @@ export class AuthController {
       res.clearCookie('refresh_token');
 
       // 카카오 로그아웃 URL로 리다이렉트
-      const kakaoLogoutUrl = `https://kauth.kakao.com/oauth/logout?client_id=${this.configService.get('KAKAO_CLIENT_ID')}&logout_redirect_uri=${encodeURIComponent(process.env.FRONTEND_URL || 'http://localhost:3001')}/auth/logout-success`;
+      const kakaoLogoutUrl = `https://kauth.kakao.com/oauth/logout?client_id=${this.configService.get('KAKAO_CLIENT_ID')}&logout_redirect_uri=${encodeURIComponent(process.env.FRONTEND_URL || 'http://localhost:3000')}/auth/logout-success`;
 
       res.redirect(kakaoLogoutUrl);
     } catch (error) {
       // 에러가 발생해도 로그아웃은 진행
       res.redirect(
-        `${process.env.FRONTEND_URL || 'http://localhost:3001'}/auth/logout-success`,
+        `${process.env.FRONTEND_URL || 'http://localhost:3000'}/auth/logout-success`,
       );
     }
   }

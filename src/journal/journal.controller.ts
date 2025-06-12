@@ -11,6 +11,7 @@ import {
   Get,
   UseGuards,
   ForbiddenException,
+  Query,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -18,6 +19,7 @@ import {
   ApiResponse,
   ApiOkResponse,
   ApiBearerAuth,
+  ApiQuery,
 } from '@nestjs/swagger';
 import { JournalService } from './journal.service';
 import {
@@ -27,6 +29,10 @@ import {
 import { TranscriptUpdateDto } from './dto/update-transcript.dto';
 import { JournalSummaryResponseDto } from './dto/journal-summary-response.dto';
 import { DownloadUrlResponseDto } from './dto/download-url-response.dto';
+import {
+  GetJournalListByDateRangeQueryDto,
+  GetJournalListByDateRangeResponseDto,
+} from './dto/journal-list-item.dto';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { CurrentUser } from 'src/auth/decorators/current-user.decorator';
 
@@ -36,6 +42,76 @@ import { CurrentUser } from 'src/auth/decorators/current-user.decorator';
 @Controller('journal')
 export class JournalController {
   constructor(private readonly journalService: JournalService) {}
+
+  @ApiOperation({
+    summary: '일지 목록 조회',
+    description: '특정 요양보호사의 날짜 범위 내 일지 목록을 조회합니다.',
+  })
+  @ApiQuery({
+    name: 'startDate',
+    required: true,
+    description: '시작 날짜 (YYYY-MM-DD 형식)',
+    type: String,
+    example: '2024-01-01',
+  })
+  @ApiQuery({
+    name: 'endDate',
+    required: true,
+    description: '종료 날짜 (YYYY-MM-DD 형식)',
+    type: String,
+    example: '2024-01-31',
+  })
+  @ApiQuery({
+    name: 'careworkerId',
+    required: true,
+    description: '요양보호사 ID',
+    type: Number,
+    example: 1,
+  })
+  @ApiResponse({
+    status: 200,
+    description: '일지 목록 조회 성공',
+    type: GetJournalListByDateRangeResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description: '잘못된 날짜 형식 또는 날짜 범위',
+  })
+  @ApiResponse({
+    status: 401,
+    description: '인증 실패',
+  })
+  @Get('list/date-range')
+  async getJournalListByDateRange(
+    @Query() query: GetJournalListByDateRangeQueryDto,
+  ): Promise<GetJournalListByDateRangeResponseDto> {
+    const parsedStartDate = new Date(query.startDate);
+    const parsedEndDate = new Date(query.endDate);
+
+    // 날짜 유효성 검사
+    if (isNaN(parsedStartDate.getTime()) || isNaN(parsedEndDate.getTime())) {
+      return {
+        success: false,
+        data: [],
+      };
+    }
+
+    if (parsedStartDate > parsedEndDate) {
+      return {
+        success: false,
+        data: [],
+      };
+    }
+
+    return {
+      success: true,
+      data: await this.journalService.getJournalListByDateRange(
+        parsedStartDate,
+        parsedEndDate,
+        query.careworkerId,
+      ),
+    };
+  }
 
   // 일지 요약 생성 API
   @Post(':id/summary')
