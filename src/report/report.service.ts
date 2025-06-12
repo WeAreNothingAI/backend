@@ -59,6 +59,8 @@ export class ReportService {
    */
   async createWeeklyReport(dto: CreateWeeklyReportFlexibleDto, user): Promise<CreateWeeklyReportResponseDto> {
     console.log('[SERVICE] createWeeklyReport 진입, dto.journalIds:', dto.journalIds);
+    // 디버깅: 파라미터 출력
+    console.log('[DEBUG] createWeeklyReport 파라미터:', JSON.stringify(dto));
     const nowKST = dayjs().tz('Asia/Seoul');
     let journals;
     let periodStart = dto.periodStart;
@@ -81,6 +83,7 @@ export class ReportService {
           where: { id: { in: dto.journalIds } },
           include: { careWorker: true },
         });
+        console.log('[DEBUG] journalIds로 조회된 일지:', journals.map(j => ({ id: j.id, createdAt: j.createdAt, clientId: j.clientId })));
         if (!journals || journals.length === 0) {
           console.error('[LOG] journalIds 조건에 맞는 일지 없음');
           throw new NotFoundException('조건에 맞는 일지가 없습니다.');
@@ -89,12 +92,19 @@ export class ReportService {
         if (dto.periodStart && dto.periodEnd) {
           const periodStartUtc = dayjs.tz(dto.periodStart, 'Asia/Seoul').startOf('day').utc();
           const periodEndUtc = dayjs.tz(dto.periodEnd, 'Asia/Seoul').endOf('day').utc();
+          console.log('[DEBUG] periodStartUtc:', periodStartUtc.format(), 'periodEndUtc:', periodEndUtc.format());
           journals = journals.filter(j => {
             const createdAt = dayjs(j.createdAt);
-            return createdAt.isSameOrAfter(periodStartUtc) && createdAt.isSameOrBefore(periodEndUtc);
+            const result = createdAt.isSameOrAfter(periodStartUtc) && createdAt.isSameOrBefore(periodEndUtc);
+            if (!result) {
+              console.log(`[DEBUG] 필터링 제외됨: id=${j.id}, createdAt=${createdAt.format()}, periodStartUtc=${periodStartUtc.format()}, periodEndUtc=${periodEndUtc.format()}`);
+            }
+            return result;
           });
         }
+        console.log('[DEBUG] 기간 필터링 후 일지:', journals.map(j => ({ id: j.id, createdAt: j.createdAt, clientId: j.clientId })));
         journals = journals.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+        console.log('[DEBUG] 정렬 후 일지:', journals.map(j => ({ id: j.id, createdAt: j.createdAt, clientId: j.clientId })));
         if (!journals || journals.length === 0) {
           console.error('[LOG] journalIds+기간 조건에 맞는 일지 없음');
           throw new NotFoundException('조건에 맞는 일지가 없습니다.');
@@ -132,6 +142,7 @@ export class ReportService {
       console.error('[LOG] 최종적으로 선택된 일지 없음');
       throw new Error('선택된 기간/조건에 해당하는 일지가 없습니다.');
     }
+    console.log('[DEBUG] 최종 보고서에 들어가는 일지:', journals.map(j => ({ id: j.id, createdAt: j.createdAt, clientId: j.clientId })));
     const journalSummary = journals.map(j => ({
       date: j.createdAt.toISOString().slice(0, 10),
       careWorker: j.careWorker?.name ?? '',
@@ -265,6 +276,8 @@ export class ReportService {
     user
   ): Promise<CreateWeeklyReportResponseDto[]> {
     console.log('[SERVICE] createWeeklyReportsGrouped 진입, dto.journalIds:', dto.journalIds);
+    // 디버깅: 파라미터 출력
+    console.log('[DEBUG] createWeeklyReportsGrouped 파라미터:', JSON.stringify(dto));
     if (dto.periodStart && dto.periodEnd) {
       const start = dayjs(dto.periodStart);
       const end = dayjs(dto.periodEnd);
@@ -285,6 +298,7 @@ export class ReportService {
       // KST → UTC 변환 적용
       const periodStartUtc = dayjs.tz(dto.periodStart, 'Asia/Seoul').startOf('day').utc().toDate();
       const periodEndUtc = dayjs.tz(dto.periodEnd, 'Asia/Seoul').endOf('day').utc().toDate();
+      console.log('[DEBUG] 그룹핑용 periodStartUtc:', periodStartUtc, 'periodEndUtc:', periodEndUtc);
       journals = await this.prisma.journal.findMany({
         where: {
           createdAt: {
@@ -294,14 +308,24 @@ export class ReportService {
         },
         include: { careWorker: true, client: true },
       });
+      console.log('[DEBUG] 기간 내 전체 일지:', journals.map(j => ({ id: j.id, createdAt: j.createdAt, clientId: j.clientId })));
       if (!journals || journals.length === 0) {
         throw new NotFoundException('조건에 맞는 일지가 없습니다.');
+      }
+      // [추가] 월~금(평일)만 필터링
+      journals = journals.filter(j => {
+        const day = dayjs(j.createdAt).tz('Asia/Seoul').day(); // 0:일, 1:월, ..., 5:금, 6:토
+        return day >= 1 && day <= 5;
+      });
+      if (!journals || journals.length === 0) {
+        throw new NotFoundException('기간 내 평일(월~금) 일지가 없습니다.');
       }
     } else {
       throw new BadRequestException('journalIds 또는 기간 중 하나는 필수입니다.');
     }
     // 복지사 담당 어르신만 필터링
     const filteredJournals = journals.filter(j => j.client?.socialWorkerId === user.id);
+    console.log('[DEBUG] 복지사 담당 어르신 일지:', filteredJournals.map(j => ({ id: j.id, createdAt: j.createdAt, clientId: j.clientId })));
     if (filteredJournals.length === 0) {
       throw new ForbiddenException('복지사가 담당하는 어르신의 일지가 없습니다.');
     }
@@ -310,6 +334,10 @@ export class ReportService {
     for (const j of filteredJournals) {
       if (!grouped.has(j.clientId)) grouped.set(j.clientId, []);
       grouped.get(j.clientId)!.push(j);
+    }
+    // 그룹핑 후 로그
+    for (const [clientId, clientJournals] of grouped.entries()) {
+      console.log(`[DEBUG] 그룹핑 후 clientId: ${clientId}, 일지 개수: ${clientJournals.length}, 일지 id: ${clientJournals.map(j => j.id)}`);
     }
     // 각 어르신별로 모든 일지로 주간보고서 생성 (제한 없음)
     const results: CreateWeeklyReportResponseDto[] = [];
