@@ -89,6 +89,7 @@ def gpt_weekly_report_all(journalSummary, clientName, birthDate, guardianContact
         "  ]\n"
         "}\n"
         "반드시 코드블록 없이, key와 value 모두 쌍따옴표로 감싼 올바른 JSON만 반환해줘. 설명, 주석, 코드블록, 불필요한 텍스트 없이 JSON만 출력해."
+        "- 요양 등급(careLevel)은 반드시 어르신의 상태와 일지 내용을 바탕으로 추정해서 채워줘. (예: '요양 2등급', '요양 3등급' 등, 빈 값 금지)\n"
     )
     response = client.chat.completions.create(
         model="gpt-4.1",
