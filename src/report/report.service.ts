@@ -199,7 +199,7 @@ export class ReportService {
       socialWorkerName: socialWorker?.name ?? '',
     };
     const { data }: { data: Record<string, any> } = await axios.post(
-      'http://python.service:5000/generate-weekly-report',
+      'http://python.service:5000/generate-weekly-report/',
       fastApiPayload,
       { timeout: 600000 },
     );
