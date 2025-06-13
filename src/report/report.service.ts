@@ -198,49 +198,60 @@ export class ReportService {
       reportDate,
       socialWorkerName: socialWorker?.name ?? '',
     };
-    const { data }: { data: Record<string, any> } = await axios.post(
-      'http://python.service:5000/generate-weekly-report/',
-      fastApiPayload,
-      { timeout: 600000 },
-    );
+    let data: Record<string, any>;
+    try {
+      const response = await axios.post(
+        'http://python.service:5000/generate-weekly-report/',
+        fastApiPayload,
+        { timeout: 600000 },
+      );
+      data = response.data as Record<string, any>;
+    } catch (error: any) {
+      if (error.response && error.response.data) {
+        console.error('FastAPI 응답 에러:', error.response.data);
+      } else {
+        console.error('FastAPI 요청 에러:', error.message);
+      }
+      throw error;
+    }
     // DB 업데이트 (GPT 결과 반영)
     await this.prisma.report.update({
       where: { id: report.id },
       data: {
-        title: data.title ?? '',
-        careLevel: data.careLevel ?? '',
+        title: data!.title ?? '',
+        careLevel: data!.careLevel ?? '',
         journalSummary: journalSummary,
-        summary: data.summary ?? '',
-        riskNotes: data.riskNotes ?? '',
-        evaluation: data.evaluation ?? '',
-        suggestion: data.suggestion ?? '',
-        exportedPdf: data.pdf_url ?? '',
-        exportedDocx: data.docx_url ?? '',
+        summary: data!.summary ?? '',
+        riskNotes: data!.riskNotes ?? '',
+        evaluation: data!.evaluation ?? '',
+        suggestion: data!.suggestion ?? '',
+        exportedPdf: data!.pdf_url ?? '',
+        exportedDocx: data!.docx_url ?? '',
       },
     });
     // file: docx_url에서 파일명만 추출
     let file = '';
-    if (data.docx_url) {
-      const parts = data.docx_url.split('/');
+    if (data!.docx_url) {
+      const parts = data!.docx_url.split('/');
       file = parts[parts.length - 1];
     }
     return normalizeStringFields({
       file,
-      docx_url: data.docx_url ?? '',
-      pdf_url: data.pdf_url ?? '',
-      title: data.title ?? '',
+      docx_url: data!.docx_url ?? '',
+      pdf_url: data!.pdf_url ?? '',
+      title: data!.title ?? '',
       clientName: client?.name ?? '',
       birthDate: client?.birthDate
         ? client.birthDate.toISOString().slice(0, 10)
         : '',
-      careLevel: data.careLevel ?? '',
+      careLevel: data!.careLevel ?? '',
       guardianContact: client?.guardianContact ?? '',
       reportDate,
       socialWorkerName: socialWorker?.name ?? '',
-      summary: data.summary ?? '',
-      riskNotes: data.riskNotes ?? '',
-      evaluation: data.evaluation ?? '',
-      suggestion: data.suggestion ?? '',
+      summary: data!.summary ?? '',
+      riskNotes: data!.riskNotes ?? '',
+      evaluation: data!.evaluation ?? '',
+      suggestion: data!.suggestion ?? '',
     }) as CreateWeeklyReportResponseDto;
   }
 
