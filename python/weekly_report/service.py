@@ -129,7 +129,9 @@ def create_weekly_report_app() -> FastAPI:
 
     @app.post("/")
     def generate_weekly_report(data: dict):
+        import traceback
         try:
+            print("[1] GPT 변환 시작")
             # GPT로 모든 항목 자동 생성 (기본 정보는 입력값 그대로 전달)
             gpt_result = gpt_weekly_report_all(
                 data["journalSummary"],
@@ -139,6 +141,7 @@ def create_weekly_report_app() -> FastAPI:
                 data.get("reportDate", ""),
                 data.get("socialWorkerName", "")
             )
+            print("[2] GPT 변환 완료")
             tpl = DocxTemplate("주간보고서양식.docx")
             context = {
                 "title": gpt_result.get("title", ""),
@@ -168,14 +171,18 @@ def create_weekly_report_app() -> FastAPI:
             docx_path = os.path.join("generated", filename)
             pdf_path = os.path.join("generated", pdf_filename)
 
+            print(f"[3] docx 저장: {docx_path}")
             # docx 저장
             tpl.save(docx_path)
 
+            print(f"[4] 빈 표 행 삭제: {docx_path}")
             # 빈 표 행(빈 줄) 삭제 후처리
             remove_empty_table_rows(docx_path)
 
+            print(f"[5] docx → pdf 변환 시작: {docx_path} -> {pdf_path}")
             # docx → pdf 변환
             convert_docx_to_pdf(docx_path, pdf_path)
+            print(f"[6] docx → pdf 변환 완료: {pdf_path}")
 
             # S3 업로드
             BUCKET_NAME = 'oncare-backend'
@@ -183,15 +190,19 @@ def create_weekly_report_app() -> FastAPI:
             docx_s3_key = f"weekly-report/docx/{filename}"
             pdf_s3_key = f"weekly-report/pdf/{pdf_filename}"
 
+            print(f"[7] S3 업로드 시작: {docx_s3_key}, {pdf_s3_key}")
             s3.upload_file(docx_path, BUCKET_NAME, docx_s3_key)
             s3.upload_file(pdf_path, BUCKET_NAME, pdf_s3_key)
+            print(f"[8] S3 업로드 완료")
 
             docx_url = f"https://{BUCKET_NAME}.s3.amazonaws.com/{docx_s3_key}"
             pdf_url = f"https://{BUCKET_NAME}.s3.amazonaws.com/{pdf_s3_key}"
 
+            print(f"[9] 로컬 파일 삭제 시작: {docx_path}, {pdf_path}")
             # (선택) 로컬 파일 삭제
             os.remove(docx_path)
             os.remove(pdf_path)
+            print(f"[10] 로컬 파일 삭제 완료")
 
             return {
                 "file": filename,
@@ -220,6 +231,7 @@ def create_weekly_report_app() -> FastAPI:
                 }
             }
         except Exception as e:
+            print("[에러 발생]", traceback.format_exc())
             raise HTTPException(status_code=500, detail=str(e))
 
     @app.post("/download-weekly-docx-url")
