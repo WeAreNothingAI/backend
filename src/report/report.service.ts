@@ -201,7 +201,7 @@ export class ReportService {
     const { data }: { data: Record<string, any> } = await axios.post(
       'http://python.service:5000/generate-weekly-report',
       fastApiPayload,
-      { timeout: 120000 },
+      { timeout: 600000 },
     );
     // DB 업데이트 (GPT 결과 반영)
     await this.prisma.report.update({
