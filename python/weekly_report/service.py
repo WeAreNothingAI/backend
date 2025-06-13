@@ -65,6 +65,8 @@ def gpt_weekly_report_all(journalSummary, clientName, birthDate, guardianContact
         "- 보고서 제목은 반드시 'YYYY년 M월 N주차 요양보호 주간보고서' 형식으로, 기간(periodStart~periodEnd) 또는 일지들의 날짜(journalSummary의 date)를 바탕으로 주차를 자동으로 추론해서 작성해줘.\n"
         "- '요양보호 일지 요약' 표 부분은 간결하게, 불필요하게 길지 않게 작성해줘.\n"
         "- 아래 세 항목(3. 건강 및 생활 상태 요약, 4. 위험 요소 및 주의사항, 5. 복지사 평가 및 제언)은 반드시 존댓말(정중한 서술체)로, 실무적으로 신뢰감 있게, 충분히 상세하게 작성해줘. (짧은 단문, 명령문, 생략체 금지)\n"
+        "- journalSummary 배열에는 같은 날짜에 여러 개의 일지가 있을 수 있으니, 날짜가 같아도 모든 일지를 표에 빠짐없이 모두 넣어줘.\n"
+        "- 절대 날짜별로 하나만 남기거나 합치지 말고, 전달받은 journalSummary 배열의 모든 항목을 표에 그대로 넣어줘.\n"
         "- 아래 JSON 형식으로 반환해줘. (코드블록 없이, 설명 없이, key와 value 모두 쌍따옴표로 감싸고, 모든 항목을 반드시 포함)\n"
         "{\n"
         "  \"title\": \"\",\n"
@@ -87,6 +89,7 @@ def gpt_weekly_report_all(journalSummary, clientName, birthDate, guardianContact
         "  ]\n"
         "}\n"
         "반드시 코드블록 없이, key와 value 모두 쌍따옴표로 감싼 올바른 JSON만 반환해줘. 설명, 주석, 코드블록, 불필요한 텍스트 없이 JSON만 출력해."
+        "- 요양 등급(careLevel)은 반드시 어르신의 상태와 일지 내용을 바탕으로 추정해서 채워줘. (예: '요양 2등급', '요양 3등급' 등, 빈 값 금지)\n"
     )
     response = client.chat.completions.create(
         model="gpt-4.1",

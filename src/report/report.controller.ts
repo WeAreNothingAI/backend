@@ -36,7 +36,9 @@ export class ReportController {
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({
     summary: '주간보고서 생성 (어르신별 자동 그룹화 지원)',
-    description: '일지 id 배열(journalIds, 여러 어르신 섞여도 됨) 또는 기간만 받아, 어르신별로 자동 그룹화하여 주간보고서를 각각 생성합니다.',
+    description: `일지 id 배열(journalIds, 여러 어르신 섞여도 됨) 또는 기간만 받아, 어르신별로 자동 그룹화하여 주간보고서를 각각 생성합니다.<br>
+    ※ 기간으로 요청 시, 자동으로 월~금(평일) 일지만 포함됩니다.<br>
+    ※ 기간 내 평일(월~금) 일지가 없으면 보고서가 생성되지 않습니다.`,
   })
   @ApiResponse({
     status: HttpStatus.CREATED,
@@ -51,14 +53,16 @@ export class ReportController {
     status: HttpStatus.BAD_REQUEST,
     description: `잘못된 요청(입력값 누락/유효하지 않은 값 등)
     <br>- journalIds 또는 기간 중 하나는 필수입니다.
-    <br>- 기간은 최대 7일(1주일)까지만 선택할 수 있습니다.`,
+    <br>- 기간은 최대 7일(1주일)까지만 선택할 수 있습니다.
+    <br>- 기간 내 평일(월~금) 일지가 없으면 보고서가 생성되지 않습니다.`,
     schema: {
       example: { statusCode: 400, message: 'journalIds 또는 기간 중 하나는 필수입니다.', error: 'Bad Request' }
     }
   })
   @ApiResponse({
     status: HttpStatus.NOT_FOUND,
-    description: '조건에 맞는 일지/보고서가 없음',
+    description: `조건에 맞는 일지/보고서가 없음
+    <br>- 기간 내 평일(월~금) 일지가 없으면 보고서가 생성되지 않습니다.`,
     schema: {
       example: { statusCode: 404, message: '조건에 맞는 일지가 없습니다.', error: 'Not Found' }
     }
@@ -74,11 +78,10 @@ export class ReportController {
     schema: {
       oneOf: [
         { example:
-           { journalIds: [1,2,3,4,5] } 
-          },
+          { periodStart: '2025-06-09', periodEnd: '2025-06-13' } 
+        },
         { example:
-          { periodStart: '2025-05-01', periodEnd: '2025-05-07' 
-          } 
+           { journalIds: [1,2,3,4,5] } 
         }
       ]
     }
@@ -87,6 +90,11 @@ export class ReportController {
     @Body() dto: CreateWeeklyReportFlexibleDto,
     @CurrentUser() user,
   ): Promise<CreateWeeklyReportResponseDto[]> {
+    // 빈 배열이면 undefined로 강제 세팅
+    if (Array.isArray(dto.journalIds) && dto.journalIds.length === 0) {
+      dto.journalIds = undefined;
+    }
+    console.log('==== [컨트롤러] dto.journalIds:', dto.journalIds);
     if (user.role !== 'socialWorker') {
       throw new ForbiddenException('복지사만 접근할 수 있습니다.');
     }

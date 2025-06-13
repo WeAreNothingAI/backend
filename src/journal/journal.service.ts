@@ -15,6 +15,9 @@ import { GenerateJournalDocxResponseDto } from './dto/generate-journal-docx-resp
 import { S3Service } from '../s3/s3.service';
 import { normalizeStringFields } from './normalize-string-fields';
 import { ClientService } from 'src/client/client.service';
+import * as dayjs from 'dayjs';
+import 'dayjs/plugin/timezone';
+import 'dayjs/plugin/utc';
 
 // Journal → python-report 요청용 매핑 유틸 함수 (클래스 정의 위에 선언)
 function mapJournalToRequest(journal: any) {
@@ -424,10 +427,14 @@ export class JournalService {
     clientId,
     careWorkerId,
     socialWorkerId,
+    periodStart, // 'YYYY-MM-DD' (KST)
+    periodEnd,   // 'YYYY-MM-DD' (KST)
   }: {
     clientId: number;
     careWorkerId?: number;
     socialWorkerId?: number;
+    periodStart?: string;
+    periodEnd?: string;
   }) {
     await this.clientService.findClient({
       id: clientId,
@@ -435,8 +442,19 @@ export class JournalService {
       careWorkerId,
     });
 
+    const where: any = { clientId };
+
+    if (periodStart && periodEnd) {
+      const periodStartUtc = dayjs.tz(periodStart, 'Asia/Seoul').utc().toDate();
+      const periodEndUtc = dayjs.tz(periodEnd, 'Asia/Seoul').add(1, 'day').utc().toDate();
+      where.createdAt = {
+        gte: periodStartUtc,
+        lt: periodEndUtc,
+      };
+    }
+
     const journals = await this.prisma.journal.findMany({
-      where: { clientId },
+      where,
       select: {
         id: true,
         createdAt: true,
