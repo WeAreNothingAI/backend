@@ -55,18 +55,20 @@
         <label for="clientId">Client ID:</label>
         <input type="number" id="clientId" value="1">
     </div>
-    
-    <div class="input-group">
-        <label for="careWorkerId">CareWorker ID:</label>
-        <input type="number" id="careWorkerId" value="1">
-    </div>
 
     <button id="recordButton">녹음 시작</button>
     <div id="status"></div>
     <div id="transcript"></div>
 
     <script>
-        const socket = io('http://localhost:3000');
+        // JWT 토큰을 여기에 하드코딩하세요
+        const JWT_TOKEN = '';
+        
+        const socket = io('http://localhost:3000', {
+            auth: {
+                token: JWT_TOKEN
+            }
+        });
         let mediaRecorder;
         let isRecording = false;
         let audioChunks = [];
@@ -113,8 +115,7 @@
                     
                     socket.emit('audioData', {
                         audio: Array.from(audioData),
-                        clientId: parseInt(document.getElementById('clientId').value),
-                        careWorkerId: parseInt(document.getElementById('careWorkerId').value)
+                        clientId: parseInt(document.getElementById('clientId').value)
                     });
                     
                     audioChunks = [];
@@ -140,6 +141,7 @@
             if (!isRecording) {
                 try {
                     const stream = await initializeRecording();
+                    socket.emit('startRecording');
                     mediaRecorder.start(1000);
                     
                     isRecording = true;
@@ -163,6 +165,10 @@
                         window.recordingStream.getTracks().forEach(track => track.stop());
                     }
                     
+                    socket.emit('stopRecording', {
+                        clientId: parseInt(document.getElementById('clientId').value)
+                    });
+                    
                     recordButton.textContent = '녹음 시작';
                     recordButton.classList.remove('recording');
                     showStatus('녹음이 중지되었습니다.');
@@ -175,6 +181,18 @@
 
         socket.on('transcription', (data) => {
             transcriptDiv.textContent += data.text + '\n';
+        });
+
+        socket.on('recordingStarted', () => {
+            showStatus('녹음이 시작되었습니다.');
+        });
+
+        socket.on('recordingStopped', (response) => {
+            if (response.success) {
+                showStatus('녹음이 성공적으로 저장되었습니다.');
+            } else {
+                showStatus('녹음 저장 중 오류가 발생했습니다: ' + response.error, true);
+            }
         });
 
         socket.on('error', (error) => {
