@@ -203,7 +203,7 @@ export class ReportService {
       const response = await axios.post(
         'http://python.service:5000/generate-weekly-report/',
         fastApiPayload,
-        { timeout: 1800000 },
+        { timeout: 3600000 },
       );
       data = response.data as Record<string, any>;
     } catch (error: any) {
