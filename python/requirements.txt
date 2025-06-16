@@ -11,3 +11,4 @@ pydub
 boto3
 docx2pdf
 python-docx
+gunicorn
