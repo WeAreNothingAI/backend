@@ -3,9 +3,13 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { UsersService, SocialUserInfo } from '../users/users.service';
 import { Member, Role } from '@prisma/client';
+import { ApiProperty } from '@nestjs/swagger';
 
-export interface TokenPair {
+export class TokenPair {
+  @ApiProperty({ description: 'JWT 액세스 토큰' })
   accessToken: string;
+
+  @ApiProperty({ description: 'JWT 리프레시 토큰' })
   refreshToken: string;
 }
 
@@ -56,12 +60,26 @@ export class AuthService {
       role: user.role,
     };
 
+    const jwtSecret = this.configService.get<string>('JWT_SECRET');
+    const accessExpiration = this.configService.get<string>(
+      'JWT_ACCESS_EXPIRATION',
+      '15m',
+    );
+    const refreshExpiration = this.configService.get<string>(
+      'JWT_REFRESH_EXPIRATION',
+      '7d',
+    );
+
+    if (!jwtSecret) {
+      throw new Error('JWT_SECRET is not configured');
+    }
+
     const accessToken = this.jwtService.sign(payload, {
-      expiresIn: this.configService.get<string>('JWT_ACCESS_EXPIRATION', '15m'),
+      expiresIn: accessExpiration,
     });
 
     const refreshToken = this.jwtService.sign(payload, {
-      expiresIn: this.configService.get<string>('JWT_REFRESH_EXPIRATION', '7d'),
+      expiresIn: refreshExpiration,
     });
 
     return {
@@ -82,14 +100,6 @@ export class AuthService {
       return this.generateTokens(user);
     } catch (error) {
       throw new Error('Invalid refresh token');
-    }
-  }
-
-  async verifyToken(token: string): Promise<any> {
-    try {
-      return this.jwtService.verify(token);
-    } catch (error) {
-      throw new Error('Invalid token');
     }
   }
 
