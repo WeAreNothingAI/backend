@@ -9,6 +9,7 @@ import { Server, Socket } from 'socket.io';
 import { Injectable, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { JournalService } from './journal.service';
+import * as cookie from 'cookie';
 
 interface AudioDataPayload {
   audio: number[];
@@ -37,17 +38,21 @@ export class JournalGateway
 
   async handleConnection(client: Socket) {
     try {
-      const token =
-        client.handshake.auth?.token || client.handshake.query?.token;
-      if (!token) throw new Error('Missing token');
+      const cookieHeader = client.handshake.headers.cookie;
+      if (!cookieHeader) throw new Error('No cookie');
+
+      const cookies = cookie.parse(cookieHeader);
+      const token = cookies['access_token'];
+
+      if (!token) throw new Error('No access_token');
 
       const payload = this.jwtService.verify(token);
-      client.data.user = payload; // 예: { sub: 3, role: 'CARE_WORKER' }
+      client.data.user = payload;
+      this.audioData[client.id] = [];
 
       this.logger.log(`Client connected: ${client.id} (user: ${payload.sub})`);
-      this.audioData[client.id] = [];
     } catch (error) {
-      this.logger.warn(`Authentication failed for client ${client.id}`);
+      this.logger.warn(`Auth failed for client ${client.id}: ${error.message}`);
       client.disconnect();
     }
   }
