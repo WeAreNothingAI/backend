@@ -16,7 +16,7 @@ import { CareworkerModule } from './careworker/careworker.module';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: '.env',
+      envFilePath: ['.env.local', '.env'],
     }),
     JournalModule,
     ReportModule,
