@@ -87,6 +87,7 @@ export class AuthController {
     description:
       '카카오 로그아웃 후 프론트엔드 로그아웃 성공 페이지로 리디렉션',
   })
+  @ApiBearerAuth('JWT')
   async logout(@Res() res: Response) {
     // .env 파일 또는 기본값으로 프론트엔드 URL을 가져옵니다.
     const frontendUrl =
@@ -109,6 +110,7 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: '현재 사용자 정보 조회' })
   @ApiResponse({ status: 200, description: '사용자 정보 반환' })
+  @ApiBearerAuth('JWT')
   async getProfile(@CurrentUser() user: Member) {
     return {
       id: user.id,
