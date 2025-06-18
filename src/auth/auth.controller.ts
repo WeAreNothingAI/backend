@@ -23,6 +23,8 @@ import {
 } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import { CompleteSignupDto } from './dto/complete-signup.dto';
+import { RefreshTokenDto } from './dto/refresh-token.dto';
+import { LoginResponseDto } from './dto/login-response.dto';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -41,90 +43,74 @@ export class AuthController {
 
   @Get('kakao/callback')
   @UseGuards(KakaoAuthGuard)
-  @ApiOperation({ summary: '카카오 로그인 콜백' })
+  @ApiOperation({
+    summary: '카카오 로그인 콜백 (Swagger 테스트용)',
+    description:
+      '로그인/회원가입 성공 후, access/refresh 토큰을 JSON 형태로 반환합니다.',
+  })
   @ApiResponse({
     status: 200,
-    description: '로그인 성공 후 토큰을 쿠키에 설정하고 리디렉션',
+    description: '로그인/회원가입 성공. 토큰과 신규가입 여부를 반환.',
+    type: LoginResponseDto,
   })
   async kakaoCallback(
-    @Req() req: Request & { user: Member; isNewUser?: boolean },
-    @Res() res: Response,
-  ) {
-    const user = req.user;
+    @Req() req: Request & { user: Member & { isNewUser?: boolean } },
+  ): Promise<LoginResponseDto> {
+    const isNewUser = !!req.user.isNewUser;
+    const { isNewUser: _, ...user } = req.user;
     const tokens = await this.authService.generateTokens(user);
 
-    // 쿠키에 토큰 설정
-    this.setTokenCookies(res, tokens);
+    const response = {
+      ...tokens,
+      isNewUser,
+    };
 
-    // 새 회원가입인 경우와 기존 로그인인 경우를 구분하여 리디렉션
-    const redirectUrl = req.isNewUser
-      ? `${process.env.FRONTEND_URL || 'http://localhost:3000'}/auth/signup-success`
-      : `${process.env.FRONTEND_URL || 'http://localhost:3000'}/auth/login-success`;
-
-    res.redirect(redirectUrl);
+    return response;
   }
 
   @Post('refresh')
-  @ApiOperation({ summary: '토큰 갱신' })
-  @ApiResponse({ status: 200, description: '토큰 갱신 성공' })
-  async refresh(@Req() req: Request, @Res() res: Response) {
-    const refreshToken = req.cookies['refresh_token'];
-
-    if (!refreshToken) {
-      return res.status(HttpStatus.UNAUTHORIZED).json({
-        message: 'Refresh token not found',
-      });
-    }
-
-    try {
-      const tokens = await this.authService.refreshTokens(refreshToken);
-      this.setTokenCookies(res, tokens);
-
-      return res.status(HttpStatus.OK).json({
-        message: 'Tokens refreshed successfully',
-      });
-    } catch (error) {
-      return res.status(HttpStatus.UNAUTHORIZED).json({
-        message: 'Invalid refresh token',
-      });
-    }
+  @ApiOperation({ summary: '액세스 토큰 갱신' })
+  @ApiResponse({
+    status: 200,
+    description: '새로운 액세스/리프레시 토큰 반환',
+    type: TokenPair,
+  })
+  async refresh(@Body() refreshTokenDto: RefreshTokenDto): Promise<TokenPair> {
+    return this.authService.refreshTokens(refreshTokenDto.refreshToken);
   }
 
   @Get('logout')
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: '로그아웃' })
-  @ApiResponse({ status: 200, description: '로그아웃 성공' })
-  async logout(@Req() req: Request, @Res() res: Response) {
-    try {
-      // JWT 토큰이 있다면 검증
-      const token = req.cookies['access_token'];
-      if (token) {
-        try {
-          await this.authService.verifyToken(token);
-        } catch (error) {
-          // 토큰이 유효하지 않아도 로그아웃은 진행
-        }
-      }
+  @ApiResponse({
+    status: 302,
+    description:
+      '카카오 로그아웃 후 프론트엔드 로그아웃 성공 페이지로 리디렉션',
+  })
+  @ApiBearerAuth('JWT')
+  async logout(@Res() res: Response) {
+    // .env 파일 또는 기본값으로 프론트엔드 URL을 가져옵니다.
+    const frontendUrl =
+      this.configService.get<string>('FRONTEND_URL') ||
+      'https://oncare.vercel.app';
+    const logoutRedirectUrl = `${frontendUrl.replace(
+      /\/$/,
+      '',
+    )}/auth/logout-success`;
 
-      // 쿠키 삭제
-      res.clearCookie('access_token');
-      res.clearCookie('refresh_token');
+    // 카카오 로그아웃 URL로 리다이렉트
+    const kakaoLogoutUrl = `https://kauth.kakao.com/oauth/logout?client_id=${this.configService.get(
+      'KAKAO_CLIENT_ID',
+    )}&logout_redirect_uri=${encodeURIComponent(logoutRedirectUrl)}`;
 
-      // 카카오 로그아웃 URL로 리다이렉트
-      const kakaoLogoutUrl = `https://kauth.kakao.com/oauth/logout?client_id=${this.configService.get('KAKAO_CLIENT_ID')}&logout_redirect_uri=${encodeURIComponent(process.env.FRONTEND_URL || 'http://localhost:3000')}/auth/logout-success`;
-
-      res.redirect(kakaoLogoutUrl);
-    } catch (error) {
-      // 에러가 발생해도 로그아웃은 진행
-      res.redirect(
-        `${process.env.FRONTEND_URL || 'http://localhost:3000'}/auth/logout-success`,
-      );
-    }
+    res.redirect(kakaoLogoutUrl);
   }
 
   @Get('me')
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: '현재 사용자 정보 조회' })
   @ApiResponse({ status: 200, description: '사용자 정보 반환' })
+  @ApiBearerAuth('JWT')
   async getProfile(@CurrentUser() user: Member) {
     return {
       id: user.id,
@@ -140,12 +126,11 @@ export class AuthController {
   @ApiOperation({ summary: '회원 탈퇴' })
   @ApiResponse({ status: 200, description: '회원 탈퇴 성공' })
   @ApiBearerAuth('JWT')
-  async deleteAccount(@CurrentUser() user: Member, @Res() res: Response) {
+  async deleteAccount(
+    @CurrentUser() user: Member,
+    @Res() res: Response,
+  ): Promise<Response> {
     await this.authService.deleteAccount(user.id);
-
-    // 쿠키 삭제
-    res.clearCookie('access_token');
-    res.clearCookie('refresh_token');
 
     return res.status(HttpStatus.OK).json({
       message: 'Account deleted successfully',
@@ -162,22 +147,5 @@ export class AuthController {
     @Body() dto: CompleteSignupDto,
   ) {
     return this.authService.completeSignup(user.id, dto.role);
-  }
-
-  private setTokenCookies(res: Response, tokens: TokenPair) {
-    // HTTP-Only 쿠키로 토큰 설정
-    res.cookie('access_token', tokens.accessToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 15 * 60 * 1000, // 15분
-    });
-
-    res.cookie('refresh_token', tokens.refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7일
-    });
   }
 }
