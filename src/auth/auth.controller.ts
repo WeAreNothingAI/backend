@@ -46,7 +46,7 @@ export class AuthController {
   @ApiOperation({
     summary: '카카오 로그인 콜백 (Swagger 테스트용)',
     description:
-      '로그인/회원가입 성공 후, access/refresh 토큰을 JSON 형태로 반환합니다.',
+      '로그인/회원가입 성공 후, access/refresh 토큰을 프론트엔드로 리다이렉트 또는 JSON 형태로 반환합니다.',
   })
   @ApiResponse({
     status: 200,
@@ -55,17 +55,31 @@ export class AuthController {
   })
   async kakaoCallback(
     @Req() req: Request & { user: Member & { isNewUser?: boolean } },
-  ): Promise<LoginResponseDto> {
+    @Res() res: Response,
+  ): Promise<void> {
     const isNewUser = !!req.user.isNewUser;
     const { isNewUser: _, ...user } = req.user;
     const tokens = await this.authService.generateTokens(user);
 
-    const response = {
-      ...tokens,
-      isNewUser,
-    };
+    // Swagger에서 테스트 시 쿼리 파라미터로 응답 방식 선택
+    if (req.query.test === 'true') {
+      res.json({
+        ...tokens,
+        isNewUser,
+      });
+      return;
+    }
 
-    return response;
+    // 프론트엔드로 리다이렉트하면서 토큰 전달
+    const frontendUrl =
+      this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000';
+
+    const redirectUrl = `${frontendUrl.replace(
+      /\/$/,
+      '',
+    )}/oauth/kakao?accessToken=${tokens.accessToken}&refreshToken=${tokens.refreshToken}&isNewUser=${isNewUser}`;
+    res.redirect(redirectUrl);
+    return;
   }
 
   @Post('refresh')
@@ -91,8 +105,7 @@ export class AuthController {
   async logout(@Res() res: Response) {
     // .env 파일 또는 기본값으로 프론트엔드 URL을 가져옵니다.
     const frontendUrl =
-      this.configService.get<string>('FRONTEND_URL') ||
-      'https://oncare.vercel.app';
+      this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000';
     const logoutRedirectUrl = `${frontendUrl.replace(
       /\/$/,
       '',
