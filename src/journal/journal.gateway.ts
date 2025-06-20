@@ -38,18 +38,18 @@ export class JournalGateway
 
   async handleConnection(client: Socket) {
     try {
-      const cookieHeader = client.handshake.headers.cookie;
-      if (!cookieHeader) throw new Error('No cookie');
-
-      const cookies = cookie.parse(cookieHeader);
-      const token = cookies['access_token'];
-
-      if (!token) throw new Error('No access_token');
-
+      const authToken = client.handshake.auth?.token;
+  
+      const queryToken = client.handshake.query?.token as string | undefined;
+  
+      const token = authToken || queryToken;
+      if (!token) throw new Error('No token provided');
+  
       const payload = this.jwtService.verify(token);
+  
       client.data.user = payload;
       this.audioData[client.id] = [];
-
+  
       this.logger.log(`Client connected: ${client.id} (user: ${payload.sub})`);
     } catch (error) {
       this.logger.warn(`Auth failed for client ${client.id}: ${error.message}`);
